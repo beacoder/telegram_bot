@@ -105,8 +105,8 @@ Repeat modes: `daily`, `weekly:N` (1=Mon), `monthly:N` (day), `interval:30m` / `
 - Python 3
 - [python-telegram-bot](https://github.com/python-telegram-bot/python-telegram-bot)
 - [OpenCode CLI](https://opencode.ai)
-- whisper.cpp + model (optional, for voice transcription)
-- ffmpeg (optional, for audio conversion)
+- [whisper.cpp + model](https://github.com/ggml-org/whisper.cpp) (optional, for voice transcription)
+- [ffmpeg](https://github.com/ffmpeg/ffmpeg) (optional, for audio conversion)
 
 ## Installation
 
