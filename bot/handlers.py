@@ -1,12 +1,14 @@
 import asyncio
 import os
+import tempfile
 from telegram import Update
 from telegram.ext import ContextTypes
 from .config import TELEGRAM_MAX_LENGTH, AUTHORIZED_USER_ID, MAX_FILE_SIZE, MODELS
 from .utils import sanitize_prompt, clear_session
 from .media import extract_file_info, download_file, maybe_transcribe
 from .agent import execute_task
-from .state import set_model_key
+from .state import set_model_key, toggle_voice, is_voice_enabled, get_model_key
+from .piper import text_to_speech, validate_piper
 
 
 async def send_text(text: str, update: Update = None, app=None):
@@ -22,6 +24,19 @@ async def send_text(text: str, update: Update = None, app=None):
         elif app:
             await app.bot.send_message(chat_id=AUTHORIZED_USER_ID, text=chunk)
         await asyncio.sleep(0.6)
+
+
+async def send_audio(audio_path: str, update: Update = None, app=None):
+    if not os.path.exists(audio_path):
+        return
+    try:
+        with open(audio_path, "rb") as f:
+            if update:
+                await update.message.reply_voice(voice=f)
+            elif app:
+                await app.bot.send_voice(chat_id=AUTHORIZED_USER_ID, voice=f)
+    except Exception as e:
+        await send_text(f"Failed to send audio: {e}", update, app)
 
 
 async def send_files(update: Update = None, app=None):
@@ -43,6 +58,16 @@ async def send_files(update: Update = None, app=None):
                     await app.bot.send_document(chat_id=AUTHORIZED_USER_ID, document=f)
         except Exception as e:
             await send_text(f"❌ Failed to send file: {path}", update, app)
+
+
+async def handle_voice_toggle(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message.from_user.id != AUTHORIZED_USER_ID:
+        await send_text("❌ Unauthorized.", update)
+        return
+
+    enabled = toggle_voice()
+    status = "enabled" if enabled else "disabled"
+    await send_text(f"🔊 Voice output {status}.", update)
 
 
 async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -129,6 +154,7 @@ async def handle_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/free - Use free model\n"
         "/flash - Use deepseek-v4-flash model\n"
         "/pro - Use deepseek-v4-pro model\n"
+        "/voice - Toggle voice output (TTS)\n"
         "Any other message - Run agent\n",
         update
     )
