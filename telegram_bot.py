@@ -17,6 +17,7 @@ from bot.handlers import (
     handle_clear,
     handle_message,
     handle_file,
+    handle_voice_toggle,
 )
 from bot.scheduler import scheduler_loop
 from bot.handlers import send_text
@@ -42,6 +43,7 @@ def main():
     app.add_handler(CommandHandler("flash", handle_flash))
     app.add_handler(CommandHandler("pro", handle_pro))
     app.add_handler(CommandHandler("clear", handle_clear))
+    app.add_handler(CommandHandler("voice", handle_voice_toggle))
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
     app.add_handler(MessageHandler(
         filters.Document.ALL | filters.PHOTO | filters.VIDEO | filters.AUDIO | filters.VOICE,
