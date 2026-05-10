@@ -16,6 +16,10 @@ WHISPER_CPP_DIR = os.path.expanduser(os.getenv("WHISPER_CPP_DIR", ""))
 WHISPER_MODEL = os.path.expanduser(os.getenv("WHISPER_MODEL", ""))
 WHISPER_CPP_BIN = os.path.join(WHISPER_CPP_DIR, "build/bin/whisper-cli")
 
+PIPER_DIR = os.path.expanduser(os.getenv("PIPER_DIR", ""))
+PIPER_MODEL = os.getenv("PIPER_MODEL", "")
+PIPER_BIN = os.path.join(PIPER_DIR, "piper") if PIPER_DIR else "piper"
+
 TELEGRAM_MAX_LENGTH = 4000
 OPENCODE_TIMEOUT = 300
 MAX_FILE_SIZE = DEFAULT_MAX_FILE_SIZE
