@@ -1,5 +1,6 @@
 import os
 import asyncio
+import tempfile
 import logging
 from pathlib import Path
 from .config import SESSION_MARKER, AGENT_HOME, PROXY_URL, OPENCODE_TIMEOUT
@@ -48,7 +49,9 @@ async def execute_task(prompt: str, update=None, app=None, task_info: str = None
         await send_text("⚠️ Another task running, dropping this request.", update, app)
         return
 
-    from .handlers import send_text, send_files
+    from .handlers import send_text, send_files, send_audio
+    from .state import is_voice_enabled
+    from .piper import validate_piper, text_to_speech
 
     async with agent_lock:
         try:
@@ -56,6 +59,15 @@ async def execute_task(prompt: str, update=None, app=None, task_info: str = None
                 await send_text(f"🚀 {task_info}", update, app)
             await send_text("🧠 Thinking...", update, app)
             response = await run_agent(prompt)
+
+            use_tts = is_voice_enabled() and validate_piper()
+            if use_tts:
+                audio_path = tempfile.mktemp(suffix=".wav")
+                tts_result = await text_to_speech(response, audio_path)
+                if tts_result and os.path.exists(tts_result):
+                    await send_audio(tts_result, update, app)
+                    os.remove(tts_result)
+
             await send_text(response, update, app)
             await send_files(update, app)
             await send_text("✅ Agent finished.", update, app)
