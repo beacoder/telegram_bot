@@ -27,6 +27,7 @@ telegram_bot/
 │   ├── config.py           # Configuration, env vars, constants
 │   ├── handlers.py         # Command & message handlers
 │   ├── media.py            # File download, voice transcription
+│   ├── piper.py            # Piper TTS synthesis
 │   ├── scheduler.py        # Task scheduler (cron-like)
 │   ├── state.py            # Agent lock, model key state
 │   └── utils.py            # Helpers (process runner, cleanup)
@@ -41,6 +42,7 @@ telegram_bot/
 | `/free` | Switch to the free model (`minimax-m2.5-free`) |
 | `/flash` | Switch to `deepseek-v4-flash` model |
 | `/pro` | Switch to `deepseek-v4-pro` model |
+| `/voice` | Toggle voice output (TTS) |
 | `/clear` | Clear session (next message starts fresh) |
 | Any text | Send to the agent for processing |
 | Any file | Download and optionally transcribe, then run agent |
@@ -56,6 +58,7 @@ telegram_bot/
 - **Proxy Support** — Works through HTTP/SOCKS proxy environments
 - **Task Locking** — Prevents overlapping agent executions
 - **Authorized User Only** — All operations restricted to `AUTHORIZED_USER_ID`
+- **Voice Output (TTS)** — Agent responses can be converted to speech via Piper and sent as voice messages
 
 ## Configuration
 
@@ -68,6 +71,8 @@ Set these environment variables before running:
 | `PROXY_URL` | No | HTTP/SOCKS proxy URL (e.g., `socks5://127.0.0.1:7890`) |
 | `WHISPER_CPP_DIR` | No | Path to whisper.cpp directory for voice transcription |
 | `WHISPER_MODEL` | No | Path to whisper.cpp model file |
+| `PIPER_DIR` | No | Path to Piper TTS directory |
+| `PIPER_MODEL` | No | Path to Piper model file (.onnx) |
 
 ### schedule.json
 
@@ -107,6 +112,7 @@ Repeat modes: `daily`, `weekly:N` (1=Mon), `monthly:N` (day), `interval:30m` / `
 - [OpenCode CLI](https://opencode.ai)
 - [whisper.cpp + model](https://github.com/ggml-org/whisper.cpp) (optional, for voice transcription)
 - [ffmpeg](https://github.com/ffmpeg/ffmpeg) (optional, for audio conversion)
+- [Piper](https://github.com/rhasspy/piper) + model (optional, for voice output TTS)
 
 ## Installation
 
