@@ -1,25 +1,12 @@
 # Telegram ↔ OpenCode Agent Bridge
 
-Overview
---------
+## Overview
 
-This project provides a lightweight Telegram bot that connects Telegram directly to an OpenCode agent backend.
+This project provides a lightweight Telegram bot that connects Telegram directly to an OpenCode agent backend. It allows you to interact with OpenCode remotely through Telegram while supporting persistent AI sessions, file uploads, multiple model switching, scheduled tasks, and proxy environments.
 
-It allows you to interact with OpenCode remotely through Telegram while supporting:
+## Architecture
 
-- Persistent AI sessions
-- File uploads and downloads
-- Multiple model switching
-- Scheduled tasks
-- Proxy environments
-- Remote automation workflows
-
-The system is designed for personal AI operations, remote agent access, and lightweight self-hosted automation.
-
-Architecture
-------------
-
-```text
+```
 Telegram → Python Bot → OpenCode Agent
                           ↓
                     Local Workspace
@@ -29,148 +16,121 @@ Telegram → Python Bot → OpenCode Agent
                    Telegram Response
 ```
 
-Key Features
-------------
+## Project Structure
 
-### Remote AI Agent Access
-Use Telegram as a mobile interface for interacting with your OpenCode agent remotely.
+```
+telegram_bot/
+├── telegram_bot.py          # Bot entry point, Telegram app setup
+├── bot/
+│   ├── __init__.py
+│   ├── agent.py             # OpenCode agent runner
+│   ├── config.py           # Configuration, env vars, constants
+│   ├── handlers.py         # Command & message handlers
+│   ├── media.py            # File download, voice transcription
+│   ├── scheduler.py        # Task scheduler (cron-like)
+│   ├── state.py            # Agent lock, model key state
+│   └── utils.py            # Helpers (process runner, cleanup)
+└── README.md
+```
 
-Supports:
-- Conversational workflows
-- Long-running sessions
-- Persistent context
-- Remote prompting
+## Commands
 
-### Persistent Sessions
-The bot maintains session continuity between messages, allowing ongoing conversations and multi-step workflows.
+| Command | Description |
+|---------|-------------|
+| `/help` | Show available commands |
+| `/free` | Switch to the free model (`minimax-m2.5-free`) |
+| `/flash` | Switch to `deepseek-v4-flash` model |
+| `/pro` | Switch to `deepseek-v4-pro` model |
+| `/clear` | Clear session (next message starts fresh) |
+| Any text | Send to the agent for processing |
+| Any file | Download and optionally transcribe, then run agent |
 
-### File Support
-Supports uploading files directly from Telegram, including:
-- Documents
-- Images
-- Videos
-- Audio
+## Key Features
 
-Generated files can also be automatically returned back to Telegram.
+- **Remote AI Agent Access** — Use Telegram as a mobile interface for your OpenCode agent
+- **Persistent Sessions** — Maintains conversation continuity across messages
+- **File Support** — Documents, images, videos, audio; files auto-returned to Telegram
+- **Voice Transcription** — Voice messages transcribed via whisper.cpp before agent execution
+- **Multiple AI Models** — Switch between `free` (minimax), `flash` (deepseek-v4-flash), and `pro` (deepseek-v4-pro)
+- **Task Scheduler** — Lightweight cron-style scheduler supporting daily, weekly, monthly, and interval-based tasks via `schedule.json`
+- **Proxy Support** — Works through HTTP/SOCKS proxy environments
+- **Task Locking** — Prevents overlapping agent executions
+- **Authorized User Only** — All operations restricted to `AUTHORIZED_USER_ID`
 
-### Multiple AI Models
-Switch between different configured models directly from Telegram commands.
+## Configuration
 
-Useful for:
-- Fast responses
-- Higher quality reasoning
-- Cost optimization
+Set these environment variables before running:
 
-### Built-in Task Scheduler
-Includes a lightweight scheduling system for automated agent execution.
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `TELEGRAM_BOT_TOKEN` | Yes | Your Telegram bot token from @BotFather |
+| `AUTHORIZED_USER_ID` | Yes | Your Telegram user ID (integer) |
+| `PROXY_URL` | No | HTTP/SOCKS proxy URL (e.g., `socks5://127.0.0.1:7890`) |
+| `WHISPER_CPP_DIR` | No | Path to whisper.cpp directory for voice transcription |
+| `WHISPER_MODEL` | No | Path to whisper.cpp model file |
 
-Possible use cases:
-- Daily summaries
-- Periodic research
-- Automated reports
-- Scheduled monitoring tasks
-- Reminder agents
+### schedule.json
 
-### Proxy Support
-Designed to work reliably in restricted or proxied network environments.
+Place in `~/agent/schedule.json`:
 
-### Local Workspace
-All agent operations occur inside a local workspace directory, making:
-- File handling simple
-- Outputs persistent
-- Agent workflows transparent
+```json
+[
+  {
+    "prompt": "Give me today's tech news summary",
+    "run_at": "2026-05-11 09:00",
+    "repeat": "daily"
+  },
+  {
+    "prompt": "Weekly report",
+    "run_at": "2026-05-17 10:00",
+    "repeat": "weekly:1"
+  },
+  {
+    "prompt": "Monthly reminder",
+    "run_at": "2026-06-01 08:00",
+    "repeat": "monthly:1"
+  },
+  {
+    "prompt": "Ping check",
+    "run_at": "2026-05-10 12:00",
+    "repeat": "interval:30m"
+  }
+]
+```
 
-### Safe Single-Task Execution
-Includes task locking to prevent overlapping agent executions and session corruption.
+Repeat modes: `daily`, `weekly:N` (1=Mon), `monthly:N` (day), `interval:30m` / `interval:2h`
 
-Use Cases
----------
+## Requirements
 
-This project is suitable for:
+- Python 3
+- [python-telegram-bot](https://github.com/python-telegram-bot/python-telegram-bot)
+- [OpenCode CLI](https://opencode.ai)
+- whisper.cpp + model (optional, for voice transcription)
+- ffmpeg (optional, for audio conversion)
 
-- Personal AI assistant hosting
-- Remote OpenCode access
-- Mobile AI workflows
-- Lightweight AI automation
-- Self-hosted agent systems
-- Proxy-restricted environments
-- AI-powered file processing
-- Automated scheduled tasks
+## Installation
 
-Typical Workflow
-----------------
+```bash
+pip install python-telegram-bot aiohttp
+git clone https://github.com/beacoder/telegram_bot.git
+cd telegram_bot
+# Set environment variables, then:
+python telegram_bot.py
+```
+
+## Typical Workflow
 
 1. Send a message or file via Telegram
-2. Bot forwards request to OpenCode
-3. Agent processes the request
-4. Response and generated files are returned to Telegram
+2. Bot downloads & transcribes if needed, forwards to OpenCode
+3. Agent processes the request locally
+4. Response text + generated files are returned to Telegram
 
-Example workflows:
-- Summarizing uploaded PDFs
-- Generating reports
-- Running coding agents remotely
-- Processing images or documents
-- Performing scheduled AI tasks
+## Security Notes
 
-Requirements
-------------
+- Single-user design — `AUTHORIZED_USER_ID` restricts access
+- Never expose your bot token publicly
+- Run in trusted environments only
 
-Main requirements:
-- Python 3
-- OpenCode CLI
-- Telegram bot token
-- Properly configured OpenCode environment
+## License
 
-Optional:
-- HTTP/SOCKS proxy support
-
-Platform Notes
---------------
-
-The project is primarily intended for Linux/Unix-like environments.
-
-Best suited for:
-- VPS deployments
-- Personal servers
-- Home lab environments
-- Remote Linux machines
-
-Security Notes
---------------
-
-This project is intentionally designed as a single-user personal automation tool.
-
-Important considerations:
-- Restrict access to trusted Telegram accounts only
-- Never expose your Telegram bot token
-- Run in trusted environments
-- Avoid running with unrestricted permissions on sensitive systems
-
-Design Philosophy
------------------
-
-This implementation prioritizes:
-
-- Simplicity
-- Reliability
-- Minimal infrastructure
-- Local-first execution
-- Easy deployment
-- OpenCode compatibility
-
-Instead of building a heavy distributed system, the project focuses on creating a practical and robust bridge between Telegram and OpenCode.
-
-Limitations
------------
-
-Current limitations include:
-- Single-user design
-- Single active task execution
-- No real-time streaming output
-- Local filesystem dependency
-- Lightweight scheduler only
-
-Author Intent
--------------
-
-This project is intended as a lightweight personal AI operations bridge for users who want simple, reliable, and remote access to OpenCode through Telegram without requiring complex infrastructure.
+MIT
