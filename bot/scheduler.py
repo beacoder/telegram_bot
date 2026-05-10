@@ -57,13 +57,21 @@ def compute_next_run(task: dict):
             if not 1 <= day <= 31:
                 return None
             year, month = current_run.year, current_run.month
-            month += 1
-            if month > 12:
-                month = 1
-                year += 1
-            max_day = monthrange(year, month)[1]
-            next_day = min(day, max_day)
-            next_run = current_run.replace(year=year, month=month, day=next_day)
+            # Try current month first
+            if current_run.day < day:
+                # Target day hasn't passed yet this month
+                max_day = monthrange(year, month)[1]
+                next_day = min(day, max_day)
+                next_run = current_run.replace(day=next_day)
+            else:
+                # Target day already passed, move to next month
+                month += 1
+                if month > 12:
+                    month = 1
+                    year += 1
+                    max_day = monthrange(year, month)[1]
+                    next_day = min(day, max_day)
+                    next_run = current_run.replace(year=year, month=month, day=next_day)
         elif repeat.startswith("interval:"):
             val = repeat.split(":")[1]
             if val.endswith("m"):
