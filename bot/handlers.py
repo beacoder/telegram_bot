@@ -4,7 +4,7 @@ import tempfile
 from telegram import Update
 from telegram.ext import ContextTypes
 from .config import TELEGRAM_MAX_LENGTH, AUTHORIZED_USER_ID, MAX_FILE_SIZE, MODELS
-from .utils import sanitize_prompt, clear_session
+from .utils import sanitize_prompt, new_session
 from .media import extract_file_info, download_file, maybe_transcribe
 from .agent import execute_task
 from .state import set_model_key, toggle_voice, is_voice_enabled, get_model_key
@@ -138,7 +138,7 @@ async def handle_clear(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.from_user.id != AUTHORIZED_USER_ID:
         await send_text("❌ Unauthorized.", update)
         return
-    clear_session()
+    new_session()
     await send_text("✅ Session cleared. Next message starts fresh.", update)
 
 
