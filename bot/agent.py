@@ -8,11 +8,14 @@ from .utils import get_model, run_process, cleanup_media
 
 
 async def run_agent(prompt: str) -> str:
-    use_continue = os.path.exists(SESSION_MARKER)
+    has_marker = os.path.exists(SESSION_MARKER)
+    session_id = Path(SESSION_MARKER).read_text().strip() if has_marker else ""
     model = get_model()
 
     cmd = ["opencode", "run", "--model", model, "--dangerously-skip-permissions"]
-    if use_continue:
+    if session_id:
+        cmd.extend(["--session", session_id])
+    elif has_marker:
         cmd.append("--continue")
     cmd.append(prompt)
 
