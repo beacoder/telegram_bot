@@ -150,7 +150,7 @@ async def handle_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await send_text(
         "Available commands:\n"
         "/help - Show this help\n"
-        "/clear - Clear session\n"
+        "/new - New session\n"
         "/free - Use free model\n"
         "/flash - Use deepseek-v4-flash model\n"
         "/pro - Use deepseek-v4-pro model\n"
