@@ -20,14 +20,13 @@ Telegram → Python Bot → OpenCode Agent
 
 ```
 telegram_bot/
-├── telegram_bot.py          # Bot entry point, Telegram app setup
+├── telegram_bot.py         # Bot entry point, Telegram app setup
 ├── bot/
 │   ├── __init__.py
-│   ├── agent.py             # OpenCode agent runner
+│   ├── agent.py            # OpenCode agent runner
 │   ├── config.py           # Configuration, env vars, constants
 │   ├── handlers.py         # Command & message handlers
-│   ├── media.py            # File download, voice transcription
-│   ├── piper.py            # Piper TTS synthesis
+│   ├── media.py            # File download, voice transcription, Piper TTS synthesis
 │   ├── scheduler.py        # Task scheduler (cron-like)
 │   ├── state.py            # Agent lock, model key state
 │   └── utils.py            # Helpers (process runner, cleanup)
