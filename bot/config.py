@@ -37,6 +37,10 @@ os.makedirs(AGENT_MEDIA_DIR, exist_ok=True)
 os.makedirs(AGENT_UPLOAD_DIR, exist_ok=True)
 
 logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=getattr(logging, LOG_LEVEL, logging.INFO)
+    level=getattr(logging, LOG_LEVEL, logging.INFO),
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler("./telegram_bot.log", encoding="utf-8"),
+        logging.StreamHandler()
+    ]
 )
