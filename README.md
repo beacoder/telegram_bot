@@ -38,6 +38,7 @@ telegram_bot/
 | Command | Description |
 |---------|-------------|
 | `/help` | Show available commands |
+| `/history [n]` | Show session history (latest n, default all) |
 | `/free` | Switch to the free model (`minimax-m2.5-free`) |
 | `/flash` | Switch to `deepseek-v4-flash` model |
 | `/pro` | Switch to `deepseek-v4-pro` model |
