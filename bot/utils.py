@@ -22,7 +22,7 @@ def get_model() -> str:
     return MODELS[get_model_key()]
 
 
-def clear_session():
+def new_session():
     if os.path.exists(SESSION_MARKER):
         os.remove(SESSION_MARKER)
 
