@@ -134,12 +134,12 @@ async def handle_pro(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await send_text(f"✅ Switched to {MODELS['pro']}", update)
 
 
-async def handle_clear(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def handle_new(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.from_user.id != AUTHORIZED_USER_ID:
         await send_text("❌ Unauthorized.", update)
         return
     new_session()
-    await send_text("✅ Session cleared. Next message starts fresh.", update)
+    await send_text("✅ New session started.", update)
 
 
 async def handle_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
