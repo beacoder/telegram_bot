@@ -130,7 +130,7 @@ python telegram_bot.py
 1. Send a message or file via Telegram
 2. Bot downloads & transcribes if needed, forwards to OpenCode
 3. Agent processes the request locally
-4. Response text + generated files are returned to Telegram
+4. Response text/audio + generated files are returned to Telegram
 
 ## Security Notes
 
