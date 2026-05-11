@@ -42,7 +42,7 @@ telegram_bot/
 | `/flash` | Switch to `deepseek-v4-flash` model |
 | `/pro` | Switch to `deepseek-v4-pro` model |
 | `/voice` | Toggle voice output (TTS) |
-| `/clear` | Clear session (next message starts fresh) |
+| `/new` | New session |
 | Any text | Send to the agent for processing |
 | Any file | Download and optionally transcribe, then run agent |
 
