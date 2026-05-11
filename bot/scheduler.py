@@ -18,7 +18,7 @@ def load_tasks() -> list:
                 return json.loads(content)
             return []
     except Exception as e:
-        logging.error(f"[schedule] load failed: {e}")
+        logging.exception(f"[schedule] load failed: {e}")
         return []
 
 
@@ -100,7 +100,7 @@ def compute_next_run(task: dict):
         return None
 
     except Exception as e:
-        logging.error(f"[schedule] compute failed: {e}")
+        logging.exception(f"[schedule] compute failed: {e}")
         return None
 
 
@@ -120,7 +120,7 @@ async def run_scheduled_tasks(app):
                 else:
                     task["done"] = True
         except Exception as e:
-            logging.error(f"[schedule] task failed: {task}")
+            logging.exception(f"[schedule] task failed: {task}")
         updated.append(task)
 
     if updated:
@@ -136,5 +136,5 @@ async def scheduler_loop(app):
                 from .handlers import send_text
                 await send_text(f"❌ Scheduler error: {e}", None, app)
             except Exception:
-                logging.error("Failed to send Telegram alert")
+                logging.exception("Failed to send Telegram alert")
         await asyncio.sleep(30)
