@@ -11,6 +11,7 @@ from telegram.ext import (
 from bot.config import TOKEN, AUTHORIZED_USER_ID, PROXY_URL
 from bot.handlers import (
     handle_help,
+    handle_history,
     handle_free,
     handle_flash,
     handle_pro,
@@ -39,6 +40,7 @@ def main():
     )
 
     app.add_handler(CommandHandler("help", handle_help))
+    app.add_handler(CommandHandler("history", handle_history))
     app.add_handler(CommandHandler("free", handle_free))
     app.add_handler(CommandHandler("flash", handle_flash))
     app.add_handler(CommandHandler("pro", handle_pro))
