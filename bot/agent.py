@@ -61,17 +61,14 @@ async def execute_task(prompt: str, update=None, app=None, task_info: str = None
             response = await run_agent(prompt)
 
             use_tts = is_voice_enabled() and validate_piper()
-            response_sent = False
             if use_tts:
                 audio_path = tempfile.mktemp(suffix=".wav")
                 tts_result = await text_to_speech(response, audio_path)
                 if tts_result and os.path.exists(tts_result):
                     await send_audio(tts_result, update, app)
                     os.remove(tts_result)
-                    response_sent = True
 
-            if not response_sent:
-                await send_text(response, update, app)
+            await send_text(response, update, app)
             await send_files(update, app)
             await send_text("✅ Agent finished.", update, app)
         finally:
