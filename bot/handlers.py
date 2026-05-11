@@ -3,8 +3,8 @@ import os
 import tempfile
 from telegram import Update
 from telegram.ext import ContextTypes
-from .config import TELEGRAM_MAX_LENGTH, AUTHORIZED_USER_ID, MAX_FILE_SIZE, MODELS
-from .utils import sanitize_prompt, new_session
+from .config import TELEGRAM_MAX_LENGTH, AUTHORIZED_USER_ID, MAX_FILE_SIZE, MODELS, AGENT_HOME
+from .utils import sanitize_prompt, new_session, run_process
 from .media import extract_file_info, download_file, maybe_transcribe
 from .agent import execute_task
 from .state import set_model_key, toggle_voice, is_voice_enabled, get_model_key
@@ -142,6 +142,25 @@ async def handle_new(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await send_text("✅ New session started.", update)
 
 
+async def handle_history(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message.from_user.id != AUTHORIZED_USER_ID:
+        await send_text("❌ Unauthorized.", update)
+        return
+
+    args = context.args
+    cmd = ["opencode", "session", "list"]
+    if args:
+        cmd.extend(["-n", args[0]])
+
+    rc, stdout, stderr = await run_process(cmd, cwd=AGENT_HOME)
+
+    if rc != 0 or not stdout.strip():
+        await send_text("⚠️ Failed to retrieve sessions.", update)
+        return
+
+    await send_text(f"📋 Session History:\n\n{stdout.strip()}", update)
+
+
 async def handle_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.from_user.id != AUTHORIZED_USER_ID:
         await send_text("❌ Unauthorized.", update)
@@ -150,6 +169,7 @@ async def handle_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await send_text(
         "Available commands:\n"
         "/help - Show this help\n"
+        "/history [n] - Show session history (latest n, default all)\n"
         "/new - New session\n"
         "/free - Use free model\n"
         "/flash - Use deepseek-v4-flash model\n"
