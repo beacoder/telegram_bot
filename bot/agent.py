@@ -51,7 +51,7 @@ async def execute_task(prompt: str, update=None, app=None, task_info: str = None
 
     from .handlers import send_text, send_files, send_audio
     from .state import is_voice_enabled
-    from .piper import validate_piper, text_to_speech
+    from .media import validate_piper, text_to_speech
 
     async with agent_lock:
         try:
