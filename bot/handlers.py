@@ -3,12 +3,13 @@ import os
 import tempfile
 from telegram import Update
 from telegram.ext import ContextTypes
-from .config import TELEGRAM_MAX_LENGTH, AUTHORIZED_USER_ID, MAX_FILE_SIZE, MODELS, AGENT_HOME
+from .config import TELEGRAM_MAX_LENGTH, AUTHORIZED_USER_ID, MAX_FILE_SIZE, MODELS, AGENT_HOME, SESSION_MARKER
 from .utils import sanitize_prompt, new_session, run_process
 from .media import extract_file_info, download_file, maybe_transcribe
 from .agent import execute_task
 from .state import set_model_key, toggle_voice, is_voice_enabled, get_model_key
 from .media import text_to_speech, validate_piper
+from pathlib import Path
 
 
 async def send_text(text: str, update: Update = None, app=None):
@@ -158,7 +159,22 @@ async def handle_history(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await send_text("⚠️ Failed to retrieve sessions.", update)
         return
 
-    await send_text(f"📋 Session History:\n\n{stdout.strip()}", update)
+    await send_text(f"📋 Session History:\n{stdout.strip()}", update)
+
+
+async def handle_continue(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message.from_user.id != AUTHORIZED_USER_ID:
+        await send_text("❌ Unauthorized.", update)
+        return
+
+    args = context.args
+    if not args or len(args) != 1:
+        await send_text("⚠️ Usage: /continue <session-id>", update)
+        return
+
+    session_id = args[0]
+    Path(SESSION_MARKER).write_text(session_id)
+    await send_text(f"✅ Continuing session: {session_id}", update)
 
 
 async def handle_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -170,6 +186,7 @@ async def handle_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Available commands:\n"
         "/help - Show this help\n"
         "/history [n] - Show session history (latest n, default all)\n"
+        "/continue <id> - Continue a specific session\n"
         "/new - New session\n"
         "/free - Use free model\n"
         "/flash - Use deepseek-v4-flash model\n"
