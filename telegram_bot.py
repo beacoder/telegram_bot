@@ -14,7 +14,7 @@ from bot.handlers import (
     handle_free,
     handle_flash,
     handle_pro,
-    handle_clear,
+    handle_new,
     handle_message,
     handle_file,
     handle_voice_toggle,
@@ -42,7 +42,7 @@ def main():
     app.add_handler(CommandHandler("free", handle_free))
     app.add_handler(CommandHandler("flash", handle_flash))
     app.add_handler(CommandHandler("pro", handle_pro))
-    app.add_handler(CommandHandler("clear", handle_clear))
+    app.add_handler(CommandHandler("clear", handle_new))
     app.add_handler(CommandHandler("voice", handle_voice_toggle))
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
     app.add_handler(MessageHandler(
