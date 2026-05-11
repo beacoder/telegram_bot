@@ -39,6 +39,7 @@ telegram_bot/
 |---------|-------------|
 | `/help` | Show available commands |
 | `/history [n]` | Show session history (latest n, default all) |
+| `/continue <session-id>` | Continue session |
 | `/free` | Switch to the free model (`minimax-m2.5-free`) |
 | `/flash` | Switch to `deepseek-v4-flash` model |
 | `/pro` | Switch to `deepseek-v4-pro` model |
