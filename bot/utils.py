@@ -64,10 +64,15 @@ async def run_process(cmd, timeout=300, cwd=None, env=None):
         cwd=cwd
     )
 
+    stdout, stderr = b"", b""
     try:
         stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
-        return (proc.returncode, stdout.decode().strip(), stderr.decode().strip())
+        returncode = proc.returncode
     except asyncio.TimeoutError:
         proc.kill()
         await proc.wait()
-        return (None, stdout, "timeout")
+        returncode = None
+    clean_out = (stdout or b"").decode(errors="replace").strip()
+    clean_err = (stderr or b"").decode(errors="replace").strip()
+
+    return (returncode, clean_out, clean_err)
