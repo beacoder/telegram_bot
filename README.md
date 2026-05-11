@@ -73,7 +73,7 @@ Set these environment variables before running:
 | `PIPER_DIR` | No | Path to Piper TTS directory |
 | `PIPER_MODEL` | No | Path to Piper model file (.onnx) |
 
-[opencode-configuration](https://github.com/beacoder/llm/tree/main/opencode)
+Add opencode configuration: [opencode-configuration](https://github.com/beacoder/llm/tree/main/opencode)
 
 ### schedule.json
 
