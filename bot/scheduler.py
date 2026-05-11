@@ -110,14 +110,17 @@ async def run_scheduled_tasks(app):
     updated = []
 
     for task in tasks:
-        if is_task_due(task):
-            await execute_task(task["prompt"], None, app, f"Running: {task['prompt']}")
-            next_run = compute_next_run(task)
-            if next_run:
-                task["run_at"] = next_run
-                task["done"] = False
-            else:
-                task["done"] = True
+        try:
+            if is_task_due(task):
+                await execute_task(task["prompt"], None, app, f"Running: {task['prompt']}")
+                next_run = compute_next_run(task)
+                if next_run:
+                    task["run_at"] = next_run
+                    task["done"] = False
+                else:
+                    task["done"] = True
+        except Exception as e:
+            logging.error(f"[schedule] task failed: {task}")
         updated.append(task)
 
     if updated:
