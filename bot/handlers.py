@@ -8,7 +8,7 @@ from .utils import sanitize_prompt, clear_session
 from .media import extract_file_info, download_file, maybe_transcribe
 from .agent import execute_task
 from .state import set_model_key, toggle_voice, is_voice_enabled, get_model_key
-from .piper import text_to_speech, validate_piper
+from .media import text_to_speech, validate_piper
 
 
 async def send_text(text: str, update: Update = None, app=None):
