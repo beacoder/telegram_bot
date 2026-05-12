@@ -3,7 +3,6 @@ import os
 import shutil
 import tempfile
 from datetime import datetime
-import time
 from telegram import Update
 from telegram.ext import ContextTypes
 from .config import TELEGRAM_MAX_LENGTH, AUTHORIZED_USER_ID, MAX_FILE_SIZE, MODELS, AGENT_HOME, SESSION_MARKER
@@ -92,51 +91,20 @@ async def handle_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     scheduler = get_scheduler_status()
 
     try:
-        disk = shutil.disk_usage(Path(AGENT_HOME).anchor or "/")
-        used_pct = disk.used / disk.total * 100
-        disk_info = f"{round(disk.used / (1024**3), 1)}G / {round(disk.total / (1024**3), 1)}G ({used_pct:.1f}%)"
-    except Exception:
-        disk_info = "N/A"
-
-    def get_cpu_proc():
-        def read_total():
-            with open("/proc/stat") as f:
-                parts = f.readline().split()
-                return sum(int(x) for x in parts[1:]), int(parts[4])
-        (t1, i1), (t2, i2) = read_total(), read_total()
-        time.sleep(0.1)
-        (t3, i3), _ = read_total(), (0, 0)
-        dt = t3 - t1
-        di = i3 - i1
-        if dt == 0:
-            return 0.0
-        return (dt - di) / dt * 100
-
-    def get_mem_proc():
-        mem = {}
-        for line in open("/proc/meminfo"):
-            parts = line.split()
-            if len(parts) >= 2:
-                mem[parts[0]] = int(parts[1]) * 1024
-        total = mem.get("MemTotal:", 0)
-        avail = mem.get("MemAvailable:", mem.get("MemFree:", 0))
-        used = total - avail
-        if total == 0:
-            return "N/A"
-        return f"{round(used / (1024**3), 1)}G / {round(total / (1024**3), 1)}G ({used / total * 100:.1f}%)"
-
-    try:
         import psutil
         cpu_pct = f"{psutil.cpu_percent(interval=0.1):.1f}"
         mem = psutil.virtual_memory()
         mem_info = f"{round(mem.used / (1024**3), 1)}G / {round(mem.total / (1024**3), 1)}G ({mem.percent:.1f}%)"
     except Exception:
-        try:
-            cpu_pct = f"{get_cpu_proc():.1f}"
-            mem_info = get_mem_proc()
-        except Exception:
-            cpu_pct = "N/A"
-            mem_info = "N/A"
+        cpu_pct = "N/A"
+        mem_info = "N/A"
+
+    try:
+        disk = shutil.disk_usage(Path(AGENT_HOME).anchor or "/")
+        used_pct = disk.used / disk.total * 100
+        disk_info = f"{round(disk.used / (1024**3), 1)}G / {round(disk.total / (1024**3), 1)}G ({used_pct:.1f}%)"
+    except Exception:
+        disk_info = "N/A"
 
     msg = (
         f"📊 Bot Status\n"
