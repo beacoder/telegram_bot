@@ -11,6 +11,7 @@ from telegram.ext import (
 from bot.config import TOKEN, AUTHORIZED_USER_ID, PROXY_URL
 from bot.handlers import (
     handle_help,
+    handle_status,
     handle_history,
     handle_continue,
     handle_free,
@@ -21,6 +22,7 @@ from bot.handlers import (
     handle_file,
     handle_voice_toggle,
 )
+from bot.state import set_bot_start_time
 from bot.scheduler import scheduler_loop
 from bot.handlers import send_text
 
@@ -41,6 +43,7 @@ def main():
     )
 
     app.add_handler(CommandHandler("help", handle_help))
+    app.add_handler(CommandHandler("status", handle_status))
     app.add_handler(CommandHandler("history", handle_history))
     app.add_handler(CommandHandler("continue", handle_continue))
     app.add_handler(CommandHandler("free", handle_free))
@@ -59,6 +62,8 @@ def main():
     app.add_error_handler(error_handler)
 
     async def _post_init(app):
+        from datetime import datetime
+        set_bot_start_time(datetime.now())
         asyncio.create_task(scheduler_loop(app))
         await send_text("🚀 Agent ready (opencode backend).", None, app)
     app.post_init = _post_init
