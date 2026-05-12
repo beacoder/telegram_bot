@@ -1,13 +1,16 @@
 import asyncio
 import os
+import shutil
 import tempfile
+from datetime import datetime
+import psutil
 from telegram import Update
 from telegram.ext import ContextTypes
 from .config import TELEGRAM_MAX_LENGTH, AUTHORIZED_USER_ID, MAX_FILE_SIZE, MODELS, AGENT_HOME, SESSION_MARKER
 from .utils import sanitize_prompt, new_session, run_process
 from .media import extract_file_info, download_file, maybe_transcribe
 from .agent import execute_task
-from .state import set_model_key, toggle_voice, is_voice_enabled, get_model_key
+from .state import set_model_key, toggle_voice, is_voice_enabled, get_model_key, get_bot_start_time, get_scheduler_status
 from .media import text_to_speech, validate_piper
 from pathlib import Path
 
@@ -69,6 +72,51 @@ async def handle_voice_toggle(update: Update, context: ContextTypes.DEFAULT_TYPE
     enabled = toggle_voice()
     status = "enabled" if enabled else "disabled"
     await send_text(f"🔊 Voice output {status}.", update)
+
+
+async def handle_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message.from_user.id != AUTHORIZED_USER_ID:
+        await send_text("❌ Unauthorized.", update)
+        return
+
+    start = get_bot_start_time()
+    if start:
+        delta = datetime.now() - start
+        hours, remainder = divmod(int(delta.total_seconds()), 3600)
+        minutes, seconds = divmod(remainder, 60)
+        uptime = f"{hours}h {minutes}m {seconds}s"
+    else:
+        uptime = "N/A"
+
+    model = MODELS.get(get_model_key(), "unknown")
+    scheduler = get_scheduler_status()
+
+    try:
+        disk = shutil.disk_usage(Path(AGENT_HOME).anchor or "/")
+        used_pct = disk.used / disk.total * 100
+        disk_info = f"{disk.used // (1024**3)}G / {disk.total // (1024**3)}G ({used_pct:.1f}%)"
+    except Exception:
+        disk_info = "N/A"
+
+    try:
+        cpu_pct = psutil.cpu_percent(interval=0.1)
+        mem = psutil.virtual_memory()
+        mem_info = f"{mem.used // (1024**3)}G / {mem.total // (1024**3)}G ({mem.percent:.1f}%)"
+    except Exception:
+        cpu_pct = "N/A"
+        mem_info = "N/A"
+
+    msg = (
+        f"📊 Bot Status\n"
+        f"─────────────\n"
+        f"Uptime:    {uptime}\n"
+        f"Model:     {model}\n"
+        f"Scheduler: {scheduler}\n"
+        f"CPU:       {cpu_pct}%\n"
+        f"Memory:    {mem_info}\n"
+        f"Disk:      {disk_info}"
+    )
+    await send_text(msg, update)
 
 
 async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -185,6 +233,7 @@ async def handle_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await send_text(
         "Available commands:\n"
         "/help - Show this help\n"
+        "/status - Show bot health info\n"
         "/history [n] - Show session history (latest n, default all)\n"
         "/continue <id> - Continue a specific session\n"
         "/new - New session\n"
