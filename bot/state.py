@@ -7,6 +7,7 @@ agent_lock = asyncio.Lock()
 voice_enabled = False
 bot_start_time: datetime = None
 scheduler_error: str = None
+user_pending_action: dict = {}
 
 
 def get_model_key():
@@ -51,3 +52,15 @@ def get_scheduler_status() -> str:
     if scheduler_error is None:
         return "Running"
     return f"Stopped: {scheduler_error}"
+
+
+def set_pending_action(user_id: int, action: str, data: dict = None):
+    user_pending_action[user_id] = {"action": action, "data": data or {}}
+
+
+def get_pending_action(user_id: int) -> dict:
+    return user_pending_action.get(user_id)
+
+
+def clear_pending_action(user_id: int):
+    user_pending_action.pop(user_id, None)
