@@ -2,6 +2,7 @@ import os
 import json
 import asyncio
 import logging
+import uuid
 from datetime import datetime, timedelta
 from calendar import monthrange
 from .config import AGENT_SCHEDULE_FILE
@@ -15,7 +16,15 @@ def load_tasks() -> list:
         with open(AGENT_SCHEDULE_FILE, "r") as f:
             content = f.read().strip()
             if content:
-                return json.loads(content)
+                tasks = json.loads(content)
+                changed = False
+                for task in tasks:
+                    if not task.get("id"):
+                        task["id"] = str(uuid.uuid4())[:8]
+                        changed = True
+                if changed:
+                    save_tasks(tasks)
+                return tasks
             return []
     except Exception as e:
         logging.exception(f"[schedule] load failed: {e}")
