@@ -22,12 +22,11 @@ from bot.handlers import (
     handle_message,
     handle_file,
     handle_voice_toggle,
-    handle_menu,
-    handle_callback,
 )
+from bot.menu import handle_menu, handle_callback, build_main_menu
 from bot.state import set_bot_start_time
 from bot.scheduler import scheduler_loop
-from bot.handlers import send_text, build_main_menu
+from bot.handlers import send_text
 
 
 def main():
