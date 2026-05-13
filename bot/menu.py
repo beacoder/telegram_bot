@@ -1,13 +1,13 @@
 import shutil
 import uuid
 import psutil
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from .config import AUTHORIZED_USER_ID, MODELS, AGENT_HOME, SESSION_MARKER
 from .utils import new_session, run_process
-from .state import set_model_key, toggle_voice, is_voice_enabled, get_model_key, get_bot_start_time, get_scheduler_status, set_pending_action, get_pending_action, clear_pending_action
+from .state import set_model_key, toggle_voice, is_voice_enabled, get_model_key, get_bot_start_time, get_scheduler_status, get_pending_action, clear_pending_action
 
 
 def build_main_menu():
@@ -53,15 +53,6 @@ def build_voice_menu():
     return InlineKeyboardMarkup([
         [InlineKeyboardButton(f"🔊 Voice: {'ON' if enabled else 'OFF'}", callback_data="voice:toggle")],
         [InlineKeyboardButton("⬅️ Back", callback_data="menu:main")],
-    ])
-
-
-def build_scheduler_time_menu():
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton("📅 Tomorrow", callback_data="scheduler:add:tomorrow")],
-        [InlineKeyboardButton("📆 Next Week", callback_data="scheduler:add:week")],
-        [InlineKeyboardButton("✏️ Custom", callback_data="scheduler:add:custom")],
-        [InlineKeyboardButton("⬅️ Back", callback_data="menu:scheduler")],
     ])
 
 
@@ -269,20 +260,14 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.reply_text(msg, reply_markup=build_scheduler_menu())
 
     elif data == "scheduler:add":
-        await query.edit_message_text("Select time for the task:", reply_markup=build_scheduler_time_menu())
-
-    elif data == "scheduler:add:tomorrow":
-        tomorrow = (datetime.now() + timedelta(days=1)).replace(hour=9, minute=0, second=0, microsecond=0)
-        set_pending_action(user_id, "scheduler_add_prompt", {"time": tomorrow.strftime("%Y-%m-%d %H:%M")})
-        await query.edit_message_text("📝 Please enter the task description:")
-
-    elif data == "scheduler:add:week":
-        next_week = (datetime.now() + timedelta(days=7)).replace(hour=9, minute=0, second=0, microsecond=0)
-        set_pending_action(user_id, "scheduler_add_prompt", {"time": next_week.strftime("%Y-%m-%d %H:%M")})
-        await query.edit_message_text("📝 Please enter the task description:")
-
-    elif data == "scheduler:add:custom":
-        await query.edit_message_text("📝 Please enter the task in format:\n/ schedule 2026-05-20 10:00 your task description")
+        msg = (
+            "📅 Add a scheduled task by sending me a natural language prompt, e.g.:\n\n"
+            "\"提醒我每天早上7点起床\"\n"
+            "\"remind me to check email tomorrow at 9am\"\n"
+            "\"每天下午3点查询大盘数据\"\n\n"
+            "I'll parse the time and schedule it for you."
+        )
+        await query.edit_message_text(msg, reply_markup=build_scheduler_menu())
 
     elif data == "scheduler:delete":
         from .scheduler import load_tasks
