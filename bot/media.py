@@ -133,6 +133,19 @@ def validate_piper():
     return os.path.isfile(PIPER_BIN) and os.access(PIPER_BIN, os.X_OK) and os.path.isfile(PIPER_MODEL)
 
 
+def filter_chinese_text(text: str) -> str:
+    return "".join(
+        c for c in text
+        if "\u4e00" <= c <= "\u9fff"
+        or "\u3000" <= c <= "\u303f"
+        or "\uff00" <= c <= "\uffef"
+        or "a" <= c <= "z"
+        or "A" <= c <= "Z"
+        or "0" <= c <= "9"
+        or c in " .,:;!?。，：；！？、"
+    )
+
+
 async def text_to_speech(text: str, output_path: str) -> str:
     with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as tmp:
         tmp.write(text)
