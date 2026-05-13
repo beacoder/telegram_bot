@@ -6,6 +6,7 @@ from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
     MessageHandler,
+    CallbackQueryHandler,
     filters,
 )
 from bot.config import TOKEN, AUTHORIZED_USER_ID, PROXY_URL
@@ -21,10 +22,12 @@ from bot.handlers import (
     handle_message,
     handle_file,
     handle_voice_toggle,
+    handle_menu,
+    handle_callback,
 )
 from bot.state import set_bot_start_time
 from bot.scheduler import scheduler_loop
-from bot.handlers import send_text
+from bot.handlers import send_text, build_main_menu
 
 
 def main():
@@ -51,6 +54,8 @@ def main():
     app.add_handler(CommandHandler("pro", handle_pro))
     app.add_handler(CommandHandler("new", handle_new))
     app.add_handler(CommandHandler("voice", handle_voice_toggle))
+    app.add_handler(CommandHandler("menu", handle_menu))
+    app.add_handler(CallbackQueryHandler(handle_callback))
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
     app.add_handler(MessageHandler(
         filters.Document.ALL | filters.PHOTO | filters.VIDEO | filters.AUDIO | filters.VOICE,
@@ -65,7 +70,11 @@ def main():
         from datetime import datetime
         set_bot_start_time(datetime.now())
         asyncio.create_task(scheduler_loop(app))
-        await send_text("🚀 Agent ready (opencode backend).", None, app)
+        await app.bot.send_message(
+            chat_id=AUTHORIZED_USER_ID,
+            text="🚀 Agent ready (opencode backend).",
+            reply_markup=build_main_menu()
+        )
     app.post_init = _post_init
 
     app.run_polling(drop_pending_updates=True)
