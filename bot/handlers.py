@@ -2,6 +2,7 @@ import asyncio
 import os
 import shutil
 import tempfile
+import psutil
 from datetime import datetime
 from telegram import Update
 from telegram.ext import ContextTypes
@@ -91,7 +92,6 @@ async def handle_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     scheduler = get_scheduler_status()
 
     try:
-        import psutil
         cpu_pct = f"{psutil.cpu_percent(interval=0.1):.1f}"
         mem = psutil.virtual_memory()
         mem_info = f"{round(mem.used / (1024**3), 1)}G / {round(mem.total / (1024**3), 1)}G ({mem.percent:.1f}%)"
