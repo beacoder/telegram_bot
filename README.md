@@ -42,9 +42,12 @@ Use `/menu` or the menu appears automatically on bot startup:
 |------|---------|
 | **🧠 Models** | Free / Flash / Pro (with ✓ on current) |
 | **📂 Sessions** | New Session / Continue Session (pick by title) / View History |
-| **📅 Scheduler** | View Tasks / Add Task (Tomorrow / Next Week / Custom) / Delete Task |
+| **📅 Scheduler** | View Tasks / Add Task (natural language prompt) / Delete Task |
 | **🎤 Voice** | Toggle voice output ON/OFF |
 | **📊 Status** | Uptime, model, scheduler health, CPU, memory, disk |
+
+To add a scheduled task, just send a natural language prompt like:
+*"提醒我每天早上7点起床"*, *"remind me to check email tomorrow at 9am"*, *"每天下午3点查询大盘数据"*
 
 All menus have ⬅️ Back buttons to return to the main menu.
 
@@ -73,7 +76,7 @@ All menus have ⬅️ Back buttons to return to the main menu.
 - **File Support** — Documents, images, videos, audio; files auto-returned to Telegram
 - **Voice Transcription** — Voice messages transcribed via whisper.cpp before agent execution
 - **Multiple AI Models** — Switch between `free`, `flash`, and `pro` models
-- **Task Scheduler** — Lightweight cron-style scheduler supporting daily, weekly, monthly, and interval-based tasks; add/delete tasks via menu
+- **Task Scheduler** — Lightweight cron-style scheduler supporting daily, weekly, monthly, and interval-based tasks; add/delete tasks via menu; add tasks using natural language
 - **Bot Status Monitoring** — Real-time bot health: uptime, model, scheduler health, CPU, memory, disk usage
 - **Voice Output (TTS)** — Agent responses converted to speech via Piper; non-Chinese characters filtered automatically for stable Chinese voice synthesis
 - **Proxy Support** — Works through HTTP/SOCKS proxy environments
