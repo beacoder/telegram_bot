@@ -54,7 +54,7 @@ async def execute_task(prompt: str, update=None, app=None, task_info: str = None
 
     from .handlers import send_text, send_files, send_audio
     from .state import is_voice_enabled
-    from .media import validate_piper, text_to_speech
+    from .media import validate_piper, text_to_speech, filter_chinese_text
 
     async with agent_lock:
         try:
@@ -65,11 +65,13 @@ async def execute_task(prompt: str, update=None, app=None, task_info: str = None
 
             use_tts = is_voice_enabled() and validate_piper()
             if use_tts:
-                audio_path = tempfile.mktemp(suffix=".wav")
-                tts_result = await text_to_speech(response, audio_path)
-                if tts_result and os.path.exists(tts_result):
-                    await send_audio(tts_result, update, app)
-                    os.remove(tts_result)
+                cn_text = filter_chinese_text(response)
+                if cn_text.strip():
+                    audio_path = tempfile.mktemp(suffix=".wav")
+                    tts_result = await text_to_speech(cn_text, audio_path)
+                    if tts_result and os.path.exists(tts_result):
+                        await send_audio(tts_result, update, app)
+                        os.remove(tts_result)
 
             await send_text(response, update, app)
             await send_files(update, app)
