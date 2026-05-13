@@ -128,16 +128,15 @@ async def run_scheduled_tasks(app):
 
 
 async def scheduler_loop(app):
+    from .state import clear_scheduler_error, set_scheduler_error
+    from .handlers import send_text
     while True:
         try:
-            from .state import clear_scheduler_error
             clear_scheduler_error()
             await run_scheduled_tasks(app)
         except Exception as e:
-            from .state import set_scheduler_error
-            set_scheduler_error(str(e))
             try:
-                from .handlers import send_text
+                set_scheduler_error(str(e))
                 await send_text(f"❌ Scheduler error: {e}", None, app)
             except Exception:
                 logging.exception("Failed to send Telegram alert")
