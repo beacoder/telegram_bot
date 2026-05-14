@@ -1,13 +1,11 @@
-import shutil
 import uuid
-import psutil
-from datetime import datetime
 from pathlib import Path
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from .config import AUTHORIZED_USER_ID, MODELS, AGENT_HOME, SESSION_MARKER
 from .utils import new_session, run_process
-from .state import set_model_key, toggle_voice, is_voice_enabled, get_model_key, get_bot_start_time, get_scheduler_status, get_pending_action, clear_pending_action
+from .state import set_model_key, toggle_voice, is_voice_enabled, get_model_key, get_bot_start_time, get_scheduler_status, set_pending_action, get_pending_action, clear_pending_action, set_search_query, get_search_query, clear_search_query
+from .status import build_status_text
 
 
 def build_main_menu():
@@ -33,9 +31,29 @@ def build_ai_menu():
 def build_sessions_menu():
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("📝 New Session", callback_data="sessions:new")],
-        [InlineKeyboardButton("📜 Continue Session", callback_data="sessions:continue")],
         [InlineKeyboardButton("📋 View History", callback_data="sessions:history")],
+        [InlineKeyboardButton("🔍 Search Session", callback_data="sessions:search")],
         [InlineKeyboardButton("⬅️ Back", callback_data="menu:main")],
+    ])
+
+
+def build_sessions_list_menu(sessions: list, page: int, total_pages: int, nav_prefix: str = "sessions:list"):
+    buttons = []
+    for sid, title in sessions:
+        label = f"{title[:35]}…" if len(title) > 35 else title
+        buttons.append([InlineKeyboardButton(label, callback_data=f"session:select:{sid}")])
+    buttons.append(_build_nav(page, total_pages, nav_prefix))
+    buttons.append([InlineKeyboardButton("⬅️ Back", callback_data="menu:sessions")])
+    return InlineKeyboardMarkup(buttons)
+
+
+def build_session_action_menu(session_id: str, title: str):
+    label = f"{title[:35]}…" if len(title) > 35 else title
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton(f"📄 {label}", callback_data="sessions:noop")],
+        [InlineKeyboardButton("▶️ Continue", callback_data=f"session:continue:{session_id}")],
+        [InlineKeyboardButton("🗑️ Delete", callback_data=f"session:delete:{session_id}")],
+        [InlineKeyboardButton("⬅️ Back", callback_data="menu:sessions")],
     ])
 
 
@@ -48,24 +66,17 @@ def build_scheduler_menu():
     ])
 
 
-def build_voice_menu():
-    enabled = is_voice_enabled()
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton(f"🔊 Voice: {'ON' if enabled else 'OFF'}", callback_data="voice:toggle")],
-        [InlineKeyboardButton("⬅️ Back", callback_data="menu:main")],
-    ])
+def _build_nav(page: int, total_pages: int, prefix: str):
+    nav = []
+    if page > 1:
+        nav.append(InlineKeyboardButton("⬅️ Prev", callback_data=f"{prefix}:{page - 1}"))
+    nav.append(InlineKeyboardButton(f"Page {page}/{total_pages}", callback_data=f"{prefix}:noop"))
+    if page < total_pages:
+        nav.append(InlineKeyboardButton("Next ➡️", callback_data=f"{prefix}:{page + 1}"))
+    return nav
 
 
-def build_sessions_list_menu(sessions: list):
-    buttons = []
-    for sid, title in sessions[:10]:
-        label = f"{title[:35]}…" if len(title) > 35 else title
-        buttons.append([InlineKeyboardButton(label, callback_data=f"session:continue:{sid}")])
-    buttons.append([InlineKeyboardButton("⬅️ Back", callback_data="menu:sessions")])
-    return InlineKeyboardMarkup(buttons)
-
-
-def build_scheduler_tasks_menu(tasks: list, mode: str = "list"):
+def build_scheduler_tasks_menu(tasks: list, mode: str = "list", page: int = 1, total_pages: int = 1):
     buttons = []
     for i, task in enumerate(tasks):
         tid = task.get("id") or f"_idx_{i}"
@@ -75,14 +86,300 @@ def build_scheduler_tasks_menu(tasks: list, mode: str = "list"):
         else:
             done = "✅" if task.get("done") else "⏳"
             buttons.append([InlineKeyboardButton(f"{done} {label}", callback_data=f"scheduler:view:{tid}")])
+    if mode == "list":
+        buttons.append(_build_nav(page, total_pages, "scheduler:list"))
     buttons.append([InlineKeyboardButton("⬅️ Back", callback_data="menu:scheduler")])
     return InlineKeyboardMarkup(buttons)
 
 
-def build_status_menu():
+def build_voice_menu():
+    enabled = is_voice_enabled()
     return InlineKeyboardMarkup([
+        [InlineKeyboardButton(f"🔊 Voice: {'ON' if enabled else 'OFF'}", callback_data="voice:toggle")],
         [InlineKeyboardButton("⬅️ Back", callback_data="menu:main")],
     ])
+
+
+def build_status_menu():
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("🔄 Refresh", callback_data="status:refresh")],
+        [InlineKeyboardButton("⬅️ Back", callback_data="menu:main")],
+    ])
+
+
+# ── Callback Router ────────────────────────────────────────────────
+
+EXACT_ROUTES = {}
+PREFIX_ROUTES = []
+
+
+def route(exact: str = None, prefix: str = None):
+    def wrapper(func):
+        if exact:
+            EXACT_ROUTES[exact] = func
+        if prefix:
+            PREFIX_ROUTES.append((prefix, func))
+        return func
+    return wrapper
+
+
+# ── Menu Renderer ──────────────────────────────────────────────────
+
+async def render_menu(query, text, markup):
+    try:
+        await query.edit_message_text(text, reply_markup=markup)
+    except Exception as e:
+        if "message is not modified" in str(e).lower():
+            await query.answer("No changes")
+        else:
+            raise
+
+
+# ── Handler Functions ──────────────────────────────────────────────
+
+@route(exact="menu:main")
+async def _handle_menu_main(query):
+    await render_menu(query, "🖥️ Main Menu", build_main_menu())
+
+
+@route(exact="menu:ai")
+async def _handle_menu_ai(query):
+    await render_menu(query, "🧠 Select Model", build_ai_menu())
+
+
+@route(exact="menu:sessions")
+async def _handle_menu_sessions(query):
+    await render_menu(query, "📂 Sessions", build_sessions_menu())
+
+
+@route(exact="menu:scheduler")
+async def _handle_menu_scheduler(query):
+    await render_menu(query, "📅 Scheduler", build_scheduler_menu())
+
+
+@route(exact="menu:voice")
+async def _handle_menu_voice(query):
+    await render_menu(query, "🎤 Voice", build_voice_menu())
+
+
+@route(exact="menu:status")
+@route(exact="status:refresh")
+async def _handle_menu_status(query):
+    await render_menu(query, await build_status_text(), build_status_menu())
+
+
+@route(prefix="ai:")
+async def _handle_ai_select(query, model_key):
+    set_model_key(model_key)
+    await render_menu(query, f"✅ Switched to {MODELS.get(model_key, model_key)}", build_ai_menu())
+
+
+@route(exact="sessions:new")
+async def _handle_sessions_new(query):
+    new_session()
+    await render_menu(query, "✅ New session started", build_sessions_menu())
+
+
+_SESSION_PAGE_SIZE = 10
+_TASK_PAGE_SIZE = 8
+
+
+async def _render_sessions_list_page(query, page: int, all_sessions, title: str, nav_prefix: str):
+    if not all_sessions:
+        await render_menu(query, "⚠️ No sessions found", build_sessions_menu())
+        return
+    total = len(all_sessions)
+    total_pages = (total + _SESSION_PAGE_SIZE - 1) // _SESSION_PAGE_SIZE
+    page = max(1, min(page, total_pages))
+    start = (page - 1) * _SESSION_PAGE_SIZE
+    page_sessions = all_sessions[start:start + _SESSION_PAGE_SIZE]
+    await render_menu(query, title, build_sessions_list_menu(page_sessions, page, total_pages, nav_prefix=nav_prefix))
+
+
+async def _fetch_all_sessions():
+    cmd = ["opencode", "session", "list", "-n", "50"]
+    rc, stdout, stderr = await run_process(cmd, cwd=AGENT_HOME)
+    if rc != 0 or not stdout.strip():
+        return []
+    lines = [l.strip() for l in stdout.strip().split("\n") if l.strip()]
+    result = []
+    for l in lines:
+        if not l.startswith("ses_"):
+            continue
+        parts = l.split()
+        sid = parts[0]
+        title = " ".join(parts[1:-1]) if len(parts) > 2 else parts[1] if len(parts) > 1 else sid
+        result.append((sid, title))
+    return result
+
+
+# ── View History ──────────────────────────────────────────────────
+
+@route(exact="sessions:history")
+async def _handle_sessions_history(query):
+    all_sessions = await _fetch_all_sessions()
+    await _render_sessions_list_page(query, 1, all_sessions, "📋 Session History", "sessions:history")
+
+
+@route(prefix="sessions:history:")
+async def _handle_sessions_history_page(query, page_str):
+    try:
+        page = int(page_str)
+    except ValueError:
+        page = 1
+    all_sessions = await _fetch_all_sessions()
+    await _render_sessions_list_page(query, page, all_sessions, "📋 Session History", "sessions:history")
+
+
+# ── Search ────────────────────────────────────────────────────────
+
+@route(exact="sessions:search")
+async def _handle_sessions_search(query):
+    user_id = query.from_user.id
+    set_pending_action(user_id, "sessions_search")
+    await render_menu(query, "🔍 Enter a keyword to search sessions:", InlineKeyboardMarkup([
+        [InlineKeyboardButton("⬅️ Cancel", callback_data="menu:sessions")]
+    ]))
+
+
+async def _render_sessions_search_page(query, page: int, keyword: str):
+    all_sessions = await _fetch_all_sessions()
+    kw = keyword.lower()
+    filtered = [(sid, t) for sid, t in all_sessions if kw in sid.lower() or kw in t.lower()]
+    if not filtered:
+        await render_menu(query, f"🔍 No results for \"{keyword}\"", build_sessions_menu())
+        return
+    await _render_sessions_list_page(query, page, filtered, f"🔍 Results for \"{keyword}\"", "sessions:search")
+
+
+@route(prefix="sessions:search:")
+async def _handle_sessions_search_page(query, page_str):
+    try:
+        page = int(page_str)
+    except ValueError:
+        page = 1
+    keyword = get_search_query(query.from_user.id)
+    if not keyword:
+        await render_menu(query, "⚠️ Search expired, please try again.", build_sessions_menu())
+        return
+    await _render_sessions_search_page(query, page, keyword)
+
+
+# ── Session Action Menu ───────────────────────────────────────────
+
+@route(prefix="session:select:")
+async def _handle_session_select(query, session_id):
+    all_sessions = await _fetch_all_sessions()
+    title = next((t for sid, t in all_sessions if sid == session_id), session_id)
+    await render_menu(query, f"Session: {session_id}", build_session_action_menu(session_id, title))
+
+
+@route(prefix="session:continue:")
+async def _handle_session_continue(query, session_id):
+    Path(SESSION_MARKER).write_text(session_id)
+    await render_menu(query, f"✅ Continuing session: {session_id}", build_sessions_menu())
+
+
+@route(prefix="session:delete:")
+async def _handle_session_delete(query, session_id):
+    rc, stdout, stderr = await run_process(["opencode", "session", "delete", session_id], cwd=AGENT_HOME)
+    if rc != 0:
+        await render_menu(query, f"⚠️ Failed to delete session: {stderr.strip() or 'unknown error'}", build_sessions_menu())
+        return
+    await render_menu(query, f"✅ Session deleted: {session_id}", build_sessions_menu())
+
+
+@route(exact="voice:toggle")
+async def _handle_voice_toggle(query):
+    toggle_voice()
+    enabled = is_voice_enabled()
+    status = "enabled" if enabled else "disabled"
+    await render_menu(query, f"🔊 Voice output {status}.", build_voice_menu())
+
+
+@route(exact="scheduler:list")
+async def _handle_scheduler_list(query):
+    await _render_scheduler_tasks_page(query, 1)
+
+
+async def _render_scheduler_tasks_page(query, page: int):
+    from .scheduler import load_tasks
+    all_tasks = load_tasks()
+    if not all_tasks:
+        await render_menu(query, "📋 No scheduled tasks", build_scheduler_menu())
+        return
+
+    total = len(all_tasks)
+    total_pages = (total + _TASK_PAGE_SIZE - 1) // _TASK_PAGE_SIZE
+    page = max(1, min(page, total_pages))
+    start = (page - 1) * _TASK_PAGE_SIZE
+    page_tasks = all_tasks[start:start + _TASK_PAGE_SIZE]
+
+    await render_menu(query, "📋 Scheduled Tasks:", build_scheduler_tasks_menu(page_tasks, "list", page, total_pages))
+
+
+@route(prefix="scheduler:list:")
+async def _handle_scheduler_tasks_page(query, page_str):
+    try:
+        page = int(page_str)
+    except ValueError:
+        page = 1
+    await _render_scheduler_tasks_page(query, page)
+
+
+@route(prefix="scheduler:view:")
+async def _handle_scheduler_view(query, task_id):
+    if task_id.startswith("_idx_"):
+        await render_menu(query, "⚠️ Task not found. Please refresh the task list.", build_scheduler_menu())
+        return
+    from .scheduler import load_tasks
+    tasks = load_tasks()
+    task = next((t for t in tasks if t.get("id") == task_id), None)
+    if not task:
+        await render_menu(query, "⚠️ Task not found", build_scheduler_menu())
+        return
+    status = "✅ Done" if task.get("done") else "⏳ Pending"
+    repeat = task.get("repeat", "None")
+    msg = (
+        f"📋 Task Detail\n"
+        f"─────────────\n"
+        f"Prompt: {task['prompt']}\n"
+        f"Run at: {task['run_at']}\n"
+        f"Status: {status}\n"
+        f"Repeat: {repeat}"
+    )
+    await query.message.reply_text(msg, reply_markup=build_scheduler_menu())
+
+
+@route(exact="scheduler:add")
+async def _handle_scheduler_add(query):
+    msg = (
+        "📅 Add a scheduled task by sending me a natural language prompt, e.g.:\n\n"
+        "\"提醒我每天早上7点起床\"\n"
+        "\"remind me to check email tomorrow at 9am\"\n"
+        "\"每天下午3点查询大盘数据\"\n\n"
+        "I'll parse the time and schedule it for you."
+    )
+    await render_menu(query, msg, build_scheduler_menu())
+
+
+@route(exact="scheduler:delete")
+async def _handle_scheduler_delete(query):
+    from .scheduler import load_tasks
+    tasks = load_tasks()
+    if not tasks:
+        await render_menu(query, "📋 No scheduled tasks to delete", build_scheduler_menu())
+        return
+    await render_menu(query, "🗑️ Select a task to delete:", build_scheduler_tasks_menu(tasks, "delete"))
+
+
+@route(prefix="scheduler:delete:")
+async def _handle_scheduler_delete_id(query, task_id):
+    from .scheduler import load_tasks, save_tasks
+    tasks = load_tasks()
+    tasks = [t for t in tasks if t.get("id") != task_id]
+    save_tasks(tasks)
+    await render_menu(query, "✅ Task deleted", build_scheduler_menu())
 
 
 async def handle_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -104,7 +401,6 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = query.data
 
     pending = get_pending_action(user_id)
-
     if pending:
         if pending["action"] == "scheduler_add_prompt":
             task_time = pending["data"]["time"]
@@ -120,167 +416,18 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             })
             save_tasks(tasks)
             clear_pending_action(user_id)
-            await query.edit_message_text(f"✅ Task scheduled: {task_prompt[:50]}...", reply_markup=build_scheduler_menu())
+            await render_menu(query, f"✅ Task scheduled: {task_prompt[:50]}...", build_scheduler_menu())
             return
 
-    if data == "menu:main":
-        await query.edit_message_text("🖥️ Main Menu", reply_markup=build_main_menu())
-    elif data == "menu:ai":
-        await query.edit_message_text("🧠 Select Model", reply_markup=build_ai_menu())
-    elif data == "menu:sessions":
-        await query.edit_message_text("📂 Sessions", reply_markup=build_sessions_menu())
-    elif data == "menu:scheduler":
-        await query.edit_message_text("📅 Scheduler", reply_markup=build_scheduler_menu())
-    elif data == "menu:voice":
-        await query.edit_message_text("🎤 Voice", reply_markup=build_voice_menu())
-    elif data == "menu:status":
-        start = get_bot_start_time()
-        if start:
-            delta = datetime.now() - start
-            hours, remainder = divmod(int(delta.total_seconds()), 3600)
-            minutes, seconds = divmod(remainder, 60)
-            uptime = f"{hours}h {minutes}m {seconds}s"
-        else:
-            uptime = "N/A"
+    handler = EXACT_ROUTES.get(data)
+    if handler:
+        await handler(query)
+        return
 
-        model = MODELS.get(get_model_key(), "unknown")
-        scheduler = get_scheduler_status()
-
-        try:
-            cpu_pct = f"{psutil.cpu_percent(interval=0.1):.1f}"
-            mem = psutil.virtual_memory()
-            mem_info = f"{round(mem.used / (1024**3), 1)}G / {round(mem.total / (1024**3), 1)}G ({mem.percent:.1f}%)"
-        except Exception:
-            cpu_pct = "N/A"
-            mem_info = "N/A"
-
-        try:
-            disk = shutil.disk_usage(Path(AGENT_HOME).anchor or "/")
-            used_pct = disk.used / disk.total * 100
-            disk_info = f"{round(disk.used / (1024**3), 1)}G / {round(disk.total / (1024**3), 1)}G ({used_pct:.1f}%)"
-        except Exception:
-            disk_info = "N/A"
-
-        msg = (
-            f"📊 Bot Status\n"
-            f"─────────────\n"
-            f"Uptime:    {uptime}\n"
-            f"Model:     {model}\n"
-            f"Scheduler: {scheduler}\n"
-            f"CPU:       {cpu_pct}%\n"
-            f"Memory:    {mem_info}\n"
-            f"Disk:      {disk_info}"
-        )
-        await query.message.reply_text(msg, reply_markup=build_status_menu())
-
-    elif data.startswith("ai:"):
-        model = data.split(":")[1]
-        set_model_key(model)
-        await query.edit_message_text(f"✅ Switched to {MODELS.get(model, model)}", reply_markup=build_ai_menu())
-
-    elif data == "sessions:new":
-        new_session()
-        await query.edit_message_text("✅ New session started", reply_markup=build_sessions_menu())
-
-    elif data == "sessions:continue":
-        cmd = ["opencode", "session", "list", "-n", "10"]
-        rc, stdout, stderr = await run_process(cmd, cwd=AGENT_HOME)
-
-        if rc != 0 or not stdout.strip():
-            await query.edit_message_text("⚠️ No sessions found", reply_markup=build_sessions_menu())
+    for prefix, handler in PREFIX_ROUTES:
+        if data.startswith(prefix):
+            rest = data[len(prefix):]
+            await handler(query, rest)
             return
 
-        lines = [l.strip() for l in stdout.strip().split("\n") if l.strip()]
-        sessions = []
-        for l in lines:
-            if not l.startswith("ses_"):
-                continue
-            parts = l.split()
-            sid = parts[0]
-            title = " ".join(parts[1:-1]) if len(parts) > 2 else parts[1] if len(parts) > 1 else sid
-            sessions.append((sid, title))
-        if not sessions:
-            await query.edit_message_text("⚠️ No sessions found", reply_markup=build_sessions_menu())
-            return
-
-        await query.edit_message_text("Select a session to continue:", reply_markup=build_sessions_list_menu(sessions))
-
-    elif data.startswith("session:continue:"):
-        session_id = data.split(":")[-1]
-        Path(SESSION_MARKER).write_text(session_id)
-        await query.edit_message_text(f"✅ Continuing session: {session_id}", reply_markup=build_sessions_menu())
-
-    elif data == "sessions:history":
-        cmd = ["opencode", "session", "list", "-n", "10"]
-        rc, stdout, stderr = await run_process(cmd, cwd=AGENT_HOME)
-
-        if rc != 0 or not stdout.strip():
-            await query.edit_message_text("⚠️ Failed to retrieve sessions.", reply_markup=build_sessions_menu())
-            return
-
-        lines = [l.strip() for l in stdout.strip().split("\n") if l.strip()]
-        body = "\n".join(l for l in lines if l.startswith("ses_"))
-        await query.message.reply_text(f"📋 Session History:\n{body}", reply_markup=build_sessions_menu())
-
-    elif data == "voice:toggle":
-        toggle_voice()
-        enabled = is_voice_enabled()
-        status = "enabled" if enabled else "disabled"
-        await query.edit_message_text(f"🔊 Voice output {status}.", reply_markup=build_voice_menu())
-
-    elif data == "scheduler:list":
-        from .scheduler import load_tasks
-        tasks = load_tasks()
-        if not tasks:
-            await query.edit_message_text("📋 No scheduled tasks", reply_markup=build_scheduler_menu())
-            return
-        await query.edit_message_text("📋 Scheduled Tasks:", reply_markup=build_scheduler_tasks_menu(tasks, "list"))
-
-    elif data.startswith("scheduler:view:"):
-        task_id = data.split(":")[-1]
-        if task_id.startswith("_idx_"):
-            await query.edit_message_text("⚠️ Task not found. Please refresh the task list.", reply_markup=build_scheduler_menu())
-            return
-        from .scheduler import load_tasks
-        tasks = load_tasks()
-        task = next((t for t in tasks if t.get("id") == task_id), None)
-        if not task:
-            await query.edit_message_text("⚠️ Task not found", reply_markup=build_scheduler_menu())
-            return
-        status = "✅ Done" if task.get("done") else "⏳ Pending"
-        repeat = task.get("repeat", "None")
-        msg = (
-            f"📋 Task Detail\n"
-            f"─────────────\n"
-            f"Prompt: {task['prompt']}\n"
-            f"Run at: {task['run_at']}\n"
-            f"Status: {status}\n"
-            f"Repeat: {repeat}"
-        )
-        await query.message.reply_text(msg, reply_markup=build_scheduler_menu())
-
-    elif data == "scheduler:add":
-        msg = (
-            "📅 Add a scheduled task by sending me a natural language prompt, e.g.:\n\n"
-            "\"提醒我每天早上7点起床\"\n"
-            "\"remind me to check email tomorrow at 9am\"\n"
-            "\"每天下午3点查询大盘数据\"\n\n"
-            "I'll parse the time and schedule it for you."
-        )
-        await query.edit_message_text(msg, reply_markup=build_scheduler_menu())
-
-    elif data == "scheduler:delete":
-        from .scheduler import load_tasks
-        tasks = load_tasks()
-        if not tasks:
-            await query.edit_message_text("📋 No scheduled tasks to delete", reply_markup=build_scheduler_menu())
-            return
-        await query.edit_message_text("🗑️ Select a task to delete:", reply_markup=build_scheduler_tasks_menu(tasks, "delete"))
-
-    elif data.startswith("scheduler:delete:"):
-        task_id = data.split(":")[-1]
-        from .scheduler import load_tasks, save_tasks
-        tasks = load_tasks()
-        tasks = [t for t in tasks if t.get("id") != task_id]
-        save_tasks(tasks)
-        await query.edit_message_text("✅ Task deleted", reply_markup=build_scheduler_menu())
+    await query.answer("Unknown action")
