@@ -8,6 +8,19 @@ voice_enabled = False
 bot_start_time: datetime = None
 scheduler_error: str = None
 user_pending_action: dict = {}
+_search_query: dict = {}
+
+
+def set_search_query(user_id: int, query: str):
+    _search_query[user_id] = query
+
+
+def get_search_query(user_id: int) -> str:
+    return _search_query.get(user_id, "")
+
+
+def clear_search_query(user_id: int):
+    _search_query.pop(user_id, None)
 
 
 def get_model_key():
