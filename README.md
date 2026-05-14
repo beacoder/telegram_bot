@@ -42,7 +42,7 @@ Use `/menu` or the menu appears automatically on bot startup:
 | Menu | Options |
 |------|---------|
 | **🧠 Models** | Free / Flash / Pro (with ✓ on current) |
-| **📂 Sessions** | New Session / Continue Session (pick by title) / View History |
+| **📂 Sessions** | New Session / View History (with pagination) / Search Session |
 | **📅 Scheduler** | View Tasks / Add Task (natural language prompt) / Delete Task |
 | **🎤 Voice** | Toggle voice output ON/OFF |
 | **📊 Status** | Uptime, model, scheduler health, CPU, memory, disk |
