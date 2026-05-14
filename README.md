@@ -31,6 +31,7 @@ telegram_bot/
 │   ├── menu.py             # Interactive menu system (builders + callback handler)
 │   ├── scheduler.py        # Task scheduler (cron-like)
 │   ├── state.py            # Agent lock, model key, bot start time, pending actions
+│   ├── status.py           # Bot health status builder (uptime, CPU, memory, disk)
 │   └── utils.py            # Helpers (process runner, cleanup)
 ```
 
@@ -60,9 +61,10 @@ All menus have ⬅️ Back buttons to return to the main menu.
 | `/status` | Show bot health info (uptime, model, scheduler, CPU, memory, disk) |
 | `/history [n]` | Show session history (latest n, default all) |
 | `/continue <session-id>` | Continue session |
-| `/free` | Switch to the free model (`minimax-m2.5-free`) |
-| `/flash` | Switch to `deepseek-v4-flash` model |
-| `/pro` | Switch to `deepseek-v4-pro` model |
+| `/delete <session-id>` | Delete a session |
+| `/free` | Switch to the free model (`opencode/minimax-m2.5-free`) |
+| `/flash` | Switch to `deepseek/deepseek-v4-flash` model |
+| `/pro` | Switch to `deepseek/deepseek-v4-pro` model |
 | `/voice` | Toggle voice output (TTS) |
 | `/new` | New session |
 | Any text | Send to the agent for processing |
@@ -106,24 +108,32 @@ Place in `~/agent/schedule.json`:
 ```json
 [
   {
+    "id": "a1b2c3d4",
     "prompt": "Give me today's tech news summary",
     "run_at": "2026-05-11 09:00",
-    "repeat": "daily"
+    "repeat": "daily",
+    "done": false
   },
   {
+    "id": "e5f6g7h8",
     "prompt": "Weekly report",
     "run_at": "2026-05-17 10:00",
-    "repeat": "weekly:1"
+    "repeat": "weekly:1",
+    "done": false
   },
   {
+    "id": "i9j0k1l2",
     "prompt": "Monthly reminder",
     "run_at": "2026-06-01 08:00",
-    "repeat": "monthly:1"
+    "repeat": "monthly:1",
+    "done": false
   },
   {
+    "id": "m3n4o5p6",
     "prompt": "Ping check",
     "run_at": "2026-05-10 12:00",
-    "repeat": "interval:30m"
+    "repeat": "interval:30m",
+    "done": false
   }
 ]
 ```
