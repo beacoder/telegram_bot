@@ -1,33 +1,33 @@
 import asyncio
 import os
-import shutil
 import tempfile
-import psutil
-from datetime import datetime
-from telegram import Update
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from .config import TELEGRAM_MAX_LENGTH, AUTHORIZED_USER_ID, MAX_FILE_SIZE, MODELS, AGENT_HOME, SESSION_MARKER
 from .utils import sanitize_prompt, new_session, run_process
 from .media import extract_file_info, download_file, maybe_transcribe
 from .agent import execute_task
-from .state import set_model_key, toggle_voice, is_voice_enabled, get_model_key, get_bot_start_time, get_scheduler_status, get_pending_action, clear_pending_action
+from .state import set_model_key, toggle_voice, is_voice_enabled, get_pending_action, clear_pending_action, set_search_query
 from .media import text_to_speech, validate_piper
 from pathlib import Path
 import uuid
 
 
-async def send_text(text: str, update: Update = None, app=None):
+async def send_text(text: str, update: Update = None, app=None, reply_markup=None):
     if not text or not text.strip():
         return
     chunks = [
         text[i:i + TELEGRAM_MAX_LENGTH]
         for i in range(0, len(text), TELEGRAM_MAX_LENGTH)
     ]
-    for chunk in chunks:
+    for i, chunk in enumerate(chunks):
+        kw = {}
+        if reply_markup and i == len(chunks) - 1:
+            kw["reply_markup"] = reply_markup
         if update:
-            await update.message.reply_text(chunk)
+            await update.message.reply_text(chunk, **kw)
         elif app:
-            await app.bot.send_message(chat_id=AUTHORIZED_USER_ID, text=chunk)
+            await app.bot.send_message(chat_id=AUTHORIZED_USER_ID, text=chunk, **kw)
         await asyncio.sleep(0.6)
 
 
@@ -80,44 +80,10 @@ async def handle_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await send_text("❌ Unauthorized.", update)
         return
 
-    start = get_bot_start_time()
-    if start:
-        delta = datetime.now() - start
-        hours, remainder = divmod(int(delta.total_seconds()), 3600)
-        minutes, seconds = divmod(remainder, 60)
-        uptime = f"{hours}h {minutes}m {seconds}s"
-    else:
-        uptime = "N/A"
-
-    model = MODELS.get(get_model_key(), "unknown")
-    scheduler = get_scheduler_status()
-
-    try:
-        cpu_pct = f"{psutil.cpu_percent(interval=0.1):.1f}"
-        mem = psutil.virtual_memory()
-        mem_info = f"{round(mem.used / (1024**3), 1)}G / {round(mem.total / (1024**3), 1)}G ({mem.percent:.1f}%)"
-    except Exception:
-        cpu_pct = "N/A"
-        mem_info = "N/A"
-
-    try:
-        disk = shutil.disk_usage(Path(AGENT_HOME).anchor or "/")
-        used_pct = disk.used / disk.total * 100
-        disk_info = f"{round(disk.used / (1024**3), 1)}G / {round(disk.total / (1024**3), 1)}G ({used_pct:.1f}%)"
-    except Exception:
-        disk_info = "N/A"
-
-    msg = (
-        f"📊 Bot Status\n"
-        f"─────────────\n"
-        f"Uptime:    {uptime}\n"
-        f"Model:     {model}\n"
-        f"Scheduler: {scheduler}\n"
-        f"CPU:       {cpu_pct}%\n"
-        f"Memory:    {mem_info}\n"
-        f"Disk:      {disk_info}"
-    )
-    await send_text(msg, update)
+    from .status import build_status_text
+    from .menu import build_status_menu
+    msg = await build_status_text()
+    await update.message.reply_text(msg, reply_markup=build_status_menu())
 
 
 async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -171,6 +137,47 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             save_tasks(tasks)
             clear_pending_action(user_id)
             await send_text(f"✅ Task scheduled: {task_prompt[:50]}...", update)
+            return
+
+        if pending["action"] == "sessions_search":
+            keyword = update.message.text.strip()
+            clear_pending_action(user_id)
+            if not keyword:
+                await send_text("⚠️ Keyword cannot be empty.", update)
+                return
+            set_search_query(user_id, keyword)
+
+            from .menu import build_sessions_list_menu
+            _PAGE_SIZE = 10
+            cmd = ["opencode", "session", "list", "-n", "50"]
+            rc, stdout, stderr = await run_process(cmd, cwd=AGENT_HOME)
+            if rc != 0 or not stdout.strip():
+                await send_text("⚠️ No sessions found.", update)
+                return
+
+            lines = [l.strip() for l in stdout.strip().split("\n") if l.strip()]
+            all_sessions = []
+            for l in lines:
+                if not l.startswith("ses_"):
+                    continue
+                parts = l.split()
+                sid = parts[0]
+                title = " ".join(parts[1:-1]) if len(parts) > 2 else parts[1] if len(parts) > 1 else sid
+                all_sessions.append((sid, title))
+
+            kw = keyword.lower()
+            filtered = [(sid, t) for sid, t in all_sessions if kw in sid.lower() or kw in t.lower()]
+            if not filtered:
+                await send_text(f"🔍 No results for \"{keyword}\".", update)
+                return
+
+            total = len(filtered)
+            total_pages = (total + _PAGE_SIZE - 1) // _PAGE_SIZE
+            page_sessions = filtered[:_PAGE_SIZE]
+            await update.message.reply_text(
+                f"🔍 Results for \"{keyword}\":",
+                reply_markup=build_sessions_list_menu(page_sessions, 1, total_pages, nav_prefix="sessions:search")
+            )
             return
 
     prompt = sanitize_prompt(update.message.text)
@@ -247,6 +254,24 @@ async def handle_continue(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await send_text(f"✅ Continuing session: {session_id}", update)
 
 
+async def handle_delete(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message.from_user.id != AUTHORIZED_USER_ID:
+        await send_text("❌ Unauthorized.", update)
+        return
+
+    args = context.args
+    if not args or len(args) != 1:
+        await send_text("⚠️ Usage: /delete <session-id>", update)
+        return
+
+    session_id = args[0]
+    rc, stdout, stderr = await run_process(["opencode", "session", "delete", session_id], cwd=AGENT_HOME)
+    if rc != 0:
+        await send_text(f"⚠️ Failed to delete session: {stderr.strip() or 'unknown error'}", update)
+        return
+    await send_text(f"✅ Session deleted: {session_id}", update)
+
+
 async def handle_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.from_user.id != AUTHORIZED_USER_ID:
         await send_text("❌ Unauthorized.", update)
@@ -259,6 +284,7 @@ async def handle_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/status - Show bot health info\n"
         "/history [n] - Show session history (latest n, default all)\n"
         "/continue <id> - Continue a specific session\n"
+        "/delete <id> - Delete a specific session\n"
         "/new - New session\n"
         "/free - Use free model\n"
         "/flash - Use deepseek-v4-flash model\n"
