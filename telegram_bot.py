@@ -2,6 +2,7 @@
 import sys
 import asyncio
 import logging
+from telegram import BotCommand
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
@@ -15,6 +16,7 @@ from bot.handlers import (
     handle_status,
     handle_history,
     handle_continue,
+    handle_delete,
     handle_free,
     handle_flash,
     handle_pro,
@@ -48,6 +50,7 @@ def main():
     app.add_handler(CommandHandler("status", handle_status))
     app.add_handler(CommandHandler("history", handle_history))
     app.add_handler(CommandHandler("continue", handle_continue))
+    app.add_handler(CommandHandler("delete", handle_delete))
     app.add_handler(CommandHandler("free", handle_free))
     app.add_handler(CommandHandler("flash", handle_flash))
     app.add_handler(CommandHandler("pro", handle_pro))
@@ -68,6 +71,22 @@ def main():
     async def _post_init(app):
         from datetime import datetime
         set_bot_start_time(datetime.now())
+        try:
+            await app.bot.set_my_commands([
+                BotCommand("menu", "Show interactive menu"),
+                BotCommand("help", "Show help"),
+                BotCommand("status", "Show bot health info"),
+                BotCommand("history", "Show session history"),
+                BotCommand("continue", "Continue a session"),
+                BotCommand("delete", "Delete a session"),
+                BotCommand("new", "New session"),
+                BotCommand("free", "Use free model"),
+                BotCommand("flash", "Use deepseek-v4-flash model"),
+                BotCommand("pro", "Use deepseek-v4-pro model"),
+                BotCommand("voice", "Toggle voice output"),
+            ])
+        except Exception as e:
+            logging.error(f"Failed to set commands: {e}")
         asyncio.create_task(scheduler_loop(app))
         await app.bot.send_message(
             chat_id=AUTHORIZED_USER_ID,
