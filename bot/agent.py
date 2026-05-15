@@ -2,7 +2,7 @@ import os
 import tempfile
 import logging
 from pathlib import Path
-from .config import SESSION_MARKER, AGENT_HOME, OPENCODE_TIMEOUT
+from .config import SESSION_MARKER, AGENT_HOME, OPENCODE_TIMEOUT, PROXY_URL
 from .utils import get_model, run_process, cleanup_media
 
 
