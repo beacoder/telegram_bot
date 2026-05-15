@@ -1,9 +1,8 @@
 import os
-import asyncio
 import tempfile
 import logging
 from pathlib import Path
-from .config import SESSION_MARKER, AGENT_HOME, PROXY_URL, OPENCODE_TIMEOUT
+from .config import SESSION_MARKER, AGENT_HOME, OPENCODE_TIMEOUT
 from .utils import get_model, run_process, cleanup_media
 
 
@@ -45,16 +44,13 @@ async def run_agent(prompt: str) -> str:
 
 
 async def execute_task(prompt: str, update=None, app=None, task_info: str = None):
-    from .state import agent_lock
+    from .state import agent_lock, is_voice_enabled
+    from .messaging import send_text, send_files, send_audio
+    from .media import validate_piper, text_to_speech, filter_chinese_text
 
     if agent_lock.locked():
-        from .handlers import send_text
         await send_text("⚠️ Another task running, dropping this request.", update, app)
         return
-
-    from .handlers import send_text, send_files, send_audio
-    from .state import is_voice_enabled
-    from .media import validate_piper, text_to_speech, filter_chinese_text
 
     async with agent_lock:
         try:
