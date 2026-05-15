@@ -4,8 +4,9 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from .config import AUTHORIZED_USER_ID, MODELS, AGENT_HOME, SESSION_MARKER
 from .utils import new_session, run_process
-from .state import set_model_key, toggle_voice, is_voice_enabled, get_model_key, get_bot_start_time, get_scheduler_status, set_pending_action, get_pending_action, clear_pending_action, set_search_query, get_search_query, clear_search_query
+from .state import set_model_key, toggle_voice, is_voice_enabled, get_model_key, set_pending_action, get_pending_action, clear_pending_action, set_search_query, get_search_query
 from .status import build_status_text
+from .auth import authorized
 
 
 def build_main_menu():
@@ -382,10 +383,8 @@ async def _handle_scheduler_delete_id(query, task_id):
     await render_menu(query, "✅ Task deleted", build_scheduler_menu())
 
 
+@authorized
 async def handle_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.message.from_user.id != AUTHORIZED_USER_ID:
-        await update.message.reply_text("❌ Unauthorized.")
-        return
     await update.message.reply_text("🖥️ Main Menu", reply_markup=build_main_menu())
 
 
