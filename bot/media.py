@@ -16,7 +16,7 @@ def extract_file_info(message):
         file_name = getattr(message.video, "file_name", None)
         return message.video, file_name or f"video_{datetime.now().timestamp()}", False
     if message.audio:
-        file_name = getattr(message.video, "file_name", None)
+        file_name = getattr(message.audio, "file_name", None)
         return message.audio, file_name or f"audio_{datetime.now().timestamp()}", False
     if message.voice:
         return message.voice, f"voice_{datetime.now().timestamp()}.ogg", True
@@ -116,9 +116,10 @@ async def maybe_transcribe(file_path: str, is_voice: bool, update: Update, send_
     if file_path.endswith(".ogg"):
         file_path = await convert_to_wav(file_path)
 
-    if file_path:
-        transcript = await transcribe_voice(file_path)
+    if not file_path:
+        return None
 
+    transcript = await transcribe_voice(file_path)
     if not transcript:
         return None
 
