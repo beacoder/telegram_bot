@@ -32,13 +32,14 @@ async def run_agent(prompt: str) -> str:
     if rc is None:
         return "❌ Agent timed out."
 
-    Path(SESSION_MARKER).touch()
-
     if rc != 0 and stderr:
         logging.error(f"opencode error (rc={rc}): {stderr}")
+        return "❌ Agent failed with error."
 
     if not stdout:
         return "⚠️ Agent returned empty response."
+
+    Path(SESSION_MARKER).touch()
 
     return stdout
 
