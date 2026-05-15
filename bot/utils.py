@@ -1,16 +1,10 @@
 import os
 import shutil
 import asyncio
-import logging
-from datetime import datetime
-from pathlib import Path
 from .config import (
     AGENT_MEDIA_DIR,
-    AGENT_HOME,
     SESSION_MARKER,
-    TELEGRAM_MAX_LENGTH,
     PROXY_URL,
-    OPENCODE_TIMEOUT,
     MODELS,
     WHISPER_CPP_BIN,
     WHISPER_MODEL,
