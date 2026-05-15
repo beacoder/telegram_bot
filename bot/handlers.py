@@ -1,4 +1,3 @@
-import uuid
 from pathlib import Path
 from telegram import Update
 from telegram.ext import ContextTypes
@@ -57,16 +56,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     pending = get_pending_action(user_id)
 
     if pending:
-        if pending["action"] == "scheduler_add_prompt":
-            task_time = pending["data"]["time"]
-            task_prompt = update.message.text
-            from .scheduler import load_tasks, save_tasks
-            tasks = load_tasks()
-            task_id = str(uuid.uuid4())[:8]
-            tasks.append({"id": task_id, "run_at": task_time, "prompt": task_prompt, "done": False})
-            save_tasks(tasks)
+        if pending["action"] == "scheduler_add":
+            user_input = update.message.text.strip()
             clear_pending_action(user_id)
-            await send_text(f"✅ Task scheduled: {task_prompt[:50]}...", update)
+            if not user_input:
+                await send_text("⚠️ Input cannot be empty.", update)
+                return
+            await execute_task(user_input, update, None)
             return
 
         if pending["action"] == "sessions_search":
