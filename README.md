@@ -24,11 +24,13 @@ telegram_bot/
 ├── README.md
 ├── bot/
 │   ├── __init__.py
-│   ├── agent.py            # OpenCode agent runner
+│   ├── agent.py            # OpenCode agent runner + task executor
+│   ├── auth.py             # @authorized decorator for command handlers
 │   ├── config.py           # Configuration, env vars, constants
 │   ├── handlers.py         # Command handlers (help, status, history, etc.)
 │   ├── media.py            # File download, voice transcription, Piper TTS
 │   ├── menu.py             # Interactive menu system (builders + callback handler)
+│   ├── messaging.py        # Telegram message utilities (send_text, send_audio, send_files)
 │   ├── scheduler.py        # Task scheduler (cron-like)
 │   ├── state.py            # Agent lock, model key, bot start time, pending actions
 │   ├── status.py           # Bot health status builder (uptime, CPU, memory, disk)
