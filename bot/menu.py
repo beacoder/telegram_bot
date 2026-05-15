@@ -1,10 +1,9 @@
-import uuid
 from pathlib import Path
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from .config import AUTHORIZED_USER_ID, MODELS, AGENT_HOME, SESSION_MARKER
 from .utils import new_session, run_process
-from .state import set_model_key, toggle_voice, is_voice_enabled, get_model_key, set_pending_action, get_pending_action, clear_pending_action, set_search_query, get_search_query
+from .state import set_model_key, toggle_voice, is_voice_enabled, get_model_key, set_pending_action, set_search_query, get_search_query
 from .status import build_status_text
 from .auth import authorized
 
@@ -354,14 +353,18 @@ async def _handle_scheduler_view(query, task_id):
 
 @route(exact="scheduler:add")
 async def _handle_scheduler_add(query):
+    user_id = query.from_user.id
+    set_pending_action(user_id, "scheduler_add")
     msg = (
-        "📅 Add a scheduled task by sending me a natural language prompt, e.g.:\n\n"
+        "📅 Send me a natural language prompt, e.g.:\n\n"
         "\"提醒我每天早上7点起床\"\n"
         "\"remind me to check email tomorrow at 9am\"\n"
         "\"每天下午3点查询大盘数据\"\n\n"
-        "I'll parse the time and schedule it for you."
+        "I'll use AI to parse the time and schedule it."
     )
-    await render_menu(query, msg, build_scheduler_menu())
+    await render_menu(query, msg, InlineKeyboardMarkup([
+        [InlineKeyboardButton("⬅️ Cancel", callback_data="menu:scheduler")]
+    ]))
 
 
 @route(exact="scheduler:delete")
@@ -398,25 +401,6 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     data = query.data
-
-    pending = get_pending_action(user_id)
-    if pending:
-        if pending["action"] == "scheduler_add_prompt":
-            task_time = pending["data"]["time"]
-            task_prompt = query.data
-            from .scheduler import load_tasks, save_tasks
-            tasks = load_tasks()
-            task_id = str(uuid.uuid4())[:8]
-            tasks.append({
-                "id": task_id,
-                "run_at": task_time,
-                "prompt": task_prompt,
-                "done": False
-            })
-            save_tasks(tasks)
-            clear_pending_action(user_id)
-            await render_menu(query, f"✅ Task scheduled: {task_prompt[:50]}...", build_scheduler_menu())
-            return
 
     handler = EXACT_ROUTES.get(data)
     if handler:
