@@ -1,5 +1,6 @@
 import os
 import shutil
+import shlex
 import asyncio
 from .config import (
     AGENT_MEDIA_DIR,
@@ -50,8 +51,9 @@ def validate_whisper():
 
 
 async def run_process(cmd, timeout=300, cwd=None, env=None):
-    proc = await asyncio.create_subprocess_exec(
-        *cmd,
+    cmd_str = shlex.join(cmd) if isinstance(cmd, list) else cmd
+    proc = await asyncio.create_subprocess_shell(
+        cmd_str,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
         env=env,
