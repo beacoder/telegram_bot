@@ -1,96 +1,35 @@
-import asyncio
-import os
-import tempfile
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+import uuid
+from pathlib import Path
+from telegram import Update
 from telegram.ext import ContextTypes
-from .config import TELEGRAM_MAX_LENGTH, AUTHORIZED_USER_ID, MAX_FILE_SIZE, MODELS, AGENT_HOME, SESSION_MARKER
+from .config import MODELS, AGENT_HOME, SESSION_MARKER, MAX_FILE_SIZE
 from .utils import sanitize_prompt, new_session, run_process
 from .media import extract_file_info, download_file, maybe_transcribe
 from .agent import execute_task
-from .state import set_model_key, toggle_voice, is_voice_enabled, get_pending_action, clear_pending_action, set_search_query
-from .media import text_to_speech, validate_piper
-from pathlib import Path
-import uuid
+from .state import (
+    set_model_key, toggle_voice, set_search_query,
+    get_pending_action, clear_pending_action,
+)
+from .messaging import send_text
+from .auth import authorized
 
 
-async def send_text(text: str, update: Update = None, app=None, reply_markup=None):
-    if not text or not text.strip():
-        return
-    chunks = [
-        text[i:i + TELEGRAM_MAX_LENGTH]
-        for i in range(0, len(text), TELEGRAM_MAX_LENGTH)
-    ]
-    for i, chunk in enumerate(chunks):
-        kw = {}
-        if reply_markup and i == len(chunks) - 1:
-            kw["reply_markup"] = reply_markup
-        if update:
-            await update.message.reply_text(chunk, **kw)
-        elif app:
-            await app.bot.send_message(chat_id=AUTHORIZED_USER_ID, text=chunk, **kw)
-        await asyncio.sleep(0.6)
-
-
-async def send_audio(audio_path: str, update: Update = None, app=None):
-    if not os.path.exists(audio_path):
-        return
-    try:
-        with open(audio_path, "rb") as f:
-            if update:
-                await update.message.reply_voice(voice=f)
-            elif app:
-                await app.bot.send_voice(chat_id=AUTHORIZED_USER_ID, voice=f)
-    except Exception as e:
-        await send_text(f"Failed to send audio: {e}", update, app)
-
-
-async def send_files(update: Update = None, app=None):
-    from .config import AGENT_MEDIA_DIR
-    if not os.path.exists(AGENT_MEDIA_DIR):
-        return
-    files = sorted(
-        [os.path.join(AGENT_MEDIA_DIR, f) for f in os.listdir(AGENT_MEDIA_DIR)],
-        key=os.path.getmtime
-    )
-    for path in files:
-        if not os.path.isfile(path):
-            continue
-        try:
-            with open(path, "rb") as f:
-                if update:
-                    await update.message.reply_document(document=f)
-                elif app:
-                    await app.bot.send_document(chat_id=AUTHORIZED_USER_ID, document=f)
-        except Exception as e:
-            await send_text(f"❌ Failed to send file: {path}", update, app)
-
-
+@authorized
 async def handle_voice_toggle(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.message.from_user.id != AUTHORIZED_USER_ID:
-        await send_text("❌ Unauthorized.", update)
-        return
-
     enabled = toggle_voice()
-    status = "enabled" if enabled else "disabled"
-    await send_text(f"🔊 Voice output {status}.", update)
+    await send_text(f"🔊 Voice output {'enabled' if enabled else 'disabled'}.", update)
 
 
+@authorized
 async def handle_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.message.from_user.id != AUTHORIZED_USER_ID:
-        await send_text("❌ Unauthorized.", update)
-        return
-
     from .status import build_status_text
     from .menu import build_status_menu
     msg = await build_status_text()
     await update.message.reply_text(msg, reply_markup=build_status_menu())
 
 
+@authorized
 async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.message.from_user.id != AUTHORIZED_USER_ID:
-        await send_text("❌ Unauthorized.", update)
-        return
-
     file_obj, file_name, is_voice = extract_file_info(update.message)
 
     if not file_obj:
@@ -106,18 +45,14 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await send_text(f"✅ File saved: {file_path}", update)
 
         transcript = await maybe_transcribe(file_path, is_voice, update, send_text)
-
         if transcript:
             await execute_task(transcript, update, None, "Running agent from transcript...")
     except Exception as e:
         await send_text(f"❌ Failed to download file: {e}", update)
 
 
+@authorized
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.message.from_user.id != AUTHORIZED_USER_ID:
-        await send_text("❌ Unauthorized.", update)
-        return
-
     user_id = update.message.from_user.id
     pending = get_pending_action(user_id)
 
@@ -128,12 +63,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             from .scheduler import load_tasks, save_tasks
             tasks = load_tasks()
             task_id = str(uuid.uuid4())[:8]
-            tasks.append({
-                "id": task_id,
-                "run_at": task_time,
-                "prompt": task_prompt,
-                "done": False
-            })
+            tasks.append({"id": task_id, "run_at": task_time, "prompt": task_prompt, "done": False})
             save_tasks(tasks)
             clear_pending_action(user_id)
             await send_text(f"✅ Task scheduled: {task_prompt[:50]}...", update)
@@ -188,50 +118,32 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await execute_task(prompt, update, None)
 
 
-async def handle_free(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.message.from_user.id != AUTHORIZED_USER_ID:
-        await send_text("❌ Unauthorized.", update)
-        return
-    set_model_key("free")
-    await send_text(f"✅ Switched to {MODELS['free']}", update)
+def _make_model_handler(key: str):
+    @authorized
+    async def handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        set_model_key(key)
+        await send_text(f"✅ Switched to {MODELS[key]}", update)
+    return handler
 
 
-async def handle_flash(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.message.from_user.id != AUTHORIZED_USER_ID:
-        await send_text("❌ Unauthorized.", update)
-        return
-    set_model_key("flash")
-    await send_text(f"✅ Switched to {MODELS['flash']}", update)
+handle_free = _make_model_handler("free")
+handle_flash = _make_model_handler("flash")
+handle_pro = _make_model_handler("pro")
 
 
-async def handle_pro(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.message.from_user.id != AUTHORIZED_USER_ID:
-        await send_text("❌ Unauthorized.", update)
-        return
-    set_model_key("pro")
-    await send_text(f"✅ Switched to {MODELS['pro']}", update)
-
-
+@authorized
 async def handle_new(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.message.from_user.id != AUTHORIZED_USER_ID:
-        await send_text("❌ Unauthorized.", update)
-        return
     new_session()
     await send_text("✅ New session started.", update)
 
 
+@authorized
 async def handle_history(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.message.from_user.id != AUTHORIZED_USER_ID:
-        await send_text("❌ Unauthorized.", update)
-        return
-
-    args = context.args
     cmd = ["opencode", "session", "list"]
-    if args:
-        cmd.extend(["-n", args[0]])
+    if context.args:
+        cmd.extend(["-n", context.args[0]])
 
     rc, stdout, stderr = await run_process(cmd, cwd=AGENT_HOME)
-
     if rc != 0 or not stdout.strip():
         await send_text("⚠️ Failed to retrieve sessions.", update)
         return
@@ -239,32 +151,23 @@ async def handle_history(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await send_text(f"📋 Session History:\n{stdout.strip()}", update)
 
 
+@authorized
 async def handle_continue(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.message.from_user.id != AUTHORIZED_USER_ID:
-        await send_text("❌ Unauthorized.", update)
-        return
-
-    args = context.args
-    if not args or len(args) != 1:
+    if not context.args or len(context.args) != 1:
         await send_text("⚠️ Usage: /continue <session-id>", update)
         return
 
-    session_id = args[0]
-    Path(SESSION_MARKER).write_text(session_id)
-    await send_text(f"✅ Continuing session: {session_id}", update)
+    Path(SESSION_MARKER).write_text(context.args[0])
+    await send_text(f"✅ Continuing session: {context.args[0]}", update)
 
 
+@authorized
 async def handle_delete(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.message.from_user.id != AUTHORIZED_USER_ID:
-        await send_text("❌ Unauthorized.", update)
-        return
-
-    args = context.args
-    if not args or len(args) != 1:
+    if not context.args or len(context.args) != 1:
         await send_text("⚠️ Usage: /delete <session-id>", update)
         return
 
-    session_id = args[0]
+    session_id = context.args[0]
     rc, stdout, stderr = await run_process(["opencode", "session", "delete", session_id], cwd=AGENT_HOME)
     if rc != 0:
         await send_text(f"⚠️ Failed to delete session: {stderr.strip() or 'unknown error'}", update)
@@ -272,11 +175,8 @@ async def handle_delete(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await send_text(f"✅ Session deleted: {session_id}", update)
 
 
+@authorized
 async def handle_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.message.from_user.id != AUTHORIZED_USER_ID:
-        await send_text("❌ Unauthorized.", update)
-        return
-
     await send_text(
         "Available commands:\n"
         "/menu - Show interactive menu\n"
