@@ -28,7 +28,6 @@ from bot.handlers import (
 from bot.menu import handle_menu, handle_callback, build_main_menu
 from bot.state import set_bot_start_time
 from bot.scheduler import scheduler_loop
-from bot.handlers import send_text
 
 
 def main():
