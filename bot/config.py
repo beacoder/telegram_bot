@@ -6,6 +6,7 @@ AGENT_MEDIA_DIR = os.path.join(AGENT_HOME, "media")
 AGENT_UPLOAD_DIR = os.path.join(AGENT_HOME, "upload")
 AGENT_SCHEDULE_FILE = os.path.join(AGENT_HOME, "schedule.json")
 SESSION_MARKER = os.path.join(AGENT_HOME, ".session_started")
+OPENCODE_DB_PATH = os.path.expanduser("~/.local/share/opencode/opencode.db")
 
 DEFAULT_MAX_FILE_SIZE = 50 * 1024 * 1024
 
