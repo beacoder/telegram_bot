@@ -9,6 +9,8 @@ bot_start_time: datetime = None
 scheduler_error: str = None
 user_pending_action: dict = {}
 _search_query: dict = {}
+running_process = None
+stop_requested = False
 
 
 def set_search_query(user_id: int, query: str):
@@ -77,3 +79,26 @@ def get_pending_action(user_id: int) -> dict:
 
 def clear_pending_action(user_id: int):
     user_pending_action.pop(user_id, None)
+
+
+def set_running_process(proc):
+    global running_process
+    running_process = proc
+
+
+def get_running_process():
+    return running_process
+
+
+def clear_running_process():
+    global running_process
+    running_process = None
+
+
+def set_stop_requested(val: bool = True):
+    global stop_requested
+    stop_requested = val
+
+
+def is_stop_requested():
+    return stop_requested
