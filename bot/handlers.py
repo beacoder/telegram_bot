@@ -11,6 +11,7 @@ from .state import (
 )
 from .messaging import send_text
 from .auth import authorized
+import asyncio
 
 
 @authorized
@@ -45,7 +46,7 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         transcript = await maybe_transcribe(file_path, is_voice, update, send_text)
         if transcript:
-            await execute_task(transcript, update, None, "Running agent from transcript...")
+            asyncio.create_task(execute_task(transcript, update, None, "Running agent from transcript..."))
     except Exception as e:
         await send_text(f"❌ Failed to download file: {e}", update)
 
@@ -62,7 +63,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not user_input:
                 await send_text("⚠️ Input cannot be empty.", update)
                 return
-            await execute_task(user_input, update, None)
+            asyncio.create_task(execute_task(user_input, update, None))
             return
 
         if pending["action"] == "scheduler_edit":
@@ -77,7 +78,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             tasks = [t for t in tasks if t.get("id") != old_task_id]
             save_tasks(tasks)
             await send_text("🗑️ Old task deleted, creating new one...", update)
-            await execute_task(user_input, update, None)
+            asyncio.create_task(execute_task(user_input, update, None))
             return
 
         if pending["action"] == "scheduler_search":
@@ -162,7 +163,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await send_text("⚠️ Empty message.", update)
         return
 
-    await execute_task(prompt, update, None)
+    asyncio.create_task(execute_task(prompt, update, None))
 
 
 def _make_model_handler(key: str):
@@ -176,6 +177,21 @@ def _make_model_handler(key: str):
 handle_free = _make_model_handler("free")
 handle_flash = _make_model_handler("flash")
 handle_pro = _make_model_handler("pro")
+
+
+@authorized
+async def handle_stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    from .state import get_running_process, set_stop_requested
+    proc = get_running_process()
+    if proc is None:
+        await send_text("⚠️ No task is currently running.", update)
+        return
+    set_stop_requested(True)
+    try:
+        proc.kill()
+    except Exception:
+        pass
+    await send_text("🛑 Stopping current task...", update)
 
 
 @authorized
@@ -233,6 +249,7 @@ async def handle_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/continue <id> - Continue a specific session\n"
         "/delete <id> - Delete a specific session\n"
         "/new - New session\n"
+        "/cancel - Stop running agent task\n"
         "/free - Use free model\n"
         "/flash - Use deepseek-v4-flash model\n"
         "/pro - Use deepseek-v4-pro model\n"
