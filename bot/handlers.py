@@ -7,7 +7,7 @@ from .media import extract_file_info, download_file, maybe_transcribe
 from .agent import execute_task
 from .state import (
     set_model_key, toggle_voice, set_search_query,
-    get_pending_action, clear_pending_action,
+    get_pending_action, clear_pending_action, set_pending_action,
 )
 from .messaging import send_text
 from .auth import authorized
@@ -65,6 +65,74 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await execute_task(user_input, update, None)
             return
 
+        if pending["action"] == "scheduler_edit":
+            user_input = update.message.text.strip()
+            old_task_id = pending["data"].get("task_id")
+            clear_pending_action(user_id)
+            if not user_input:
+                await send_text("⚠️ Input cannot be empty.", update)
+                return
+            from .scheduler import load_tasks, save_tasks
+            tasks = load_tasks()
+            tasks = [t for t in tasks if t.get("id") != old_task_id]
+            save_tasks(tasks)
+            await send_text("🗑️ Old task deleted, creating new one...", update)
+            await execute_task(user_input, update, None)
+            return
+
+        if pending["action"] == "scheduler_search":
+            keyword = update.message.text.strip()
+            clear_pending_action(user_id)
+            if not keyword:
+                await send_text("⚠️ Keyword cannot be empty.", update)
+                return
+            set_search_query(user_id, keyword)
+
+            from .scheduler import load_tasks
+            from .menu import build_scheduler_tasks_menu
+            _TASK_PAGE_SIZE = 8
+            all_tasks = load_tasks()
+            kw = keyword.lower()
+            filtered = [t for t in all_tasks if kw in t.get("prompt", "").lower() or kw in t.get("id", "").lower()]
+
+            if not filtered:
+                await send_text(f"🔍 No results for \"{keyword}\".", update)
+                return
+
+            total = len(filtered)
+            total_pages = (total + _TASK_PAGE_SIZE - 1) // _TASK_PAGE_SIZE
+            page_tasks = filtered[:_TASK_PAGE_SIZE]
+            await update.message.reply_text(
+                f"🔍 Results for \"{keyword}\":",
+                reply_markup=build_scheduler_tasks_menu(page_tasks, "list", 1, total_pages)
+            )
+            return
+
+        if pending["action"] == "session_rename":
+            new_name = update.message.text.strip()
+            session_id = pending["data"].get("session_id")
+            clear_pending_action(user_id)
+            if not new_name:
+                await send_text("⚠️ Name cannot be empty.", update)
+                return
+            if not session_id:
+                await send_text("⚠️ Session ID missing.", update)
+                return
+            import sqlite3
+            from .config import OPENCODE_DB_PATH
+            conn = sqlite3.connect(OPENCODE_DB_PATH)
+            try:
+                conn.execute("UPDATE session SET title = ? WHERE id = ?", (new_name, session_id))
+                conn.commit()
+                affected = conn.total_changes
+            finally:
+                conn.close()
+            if affected == 0:
+                await send_text("⚠️ Session not found.", update)
+                return
+            await send_text(f"✅ Session renamed to: {new_name}", update)
+            return
+
         if pending["action"] == "sessions_search":
             keyword = update.message.text.strip()
             clear_pending_action(user_id)
@@ -73,26 +141,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 return
             set_search_query(user_id, keyword)
 
-            from .menu import build_sessions_list_menu
+            from .menu import build_sessions_list_menu, search_sessions_content
             _PAGE_SIZE = 10
-            cmd = ["opencode", "session", "list", "-n", "50"]
-            rc, stdout, stderr = await run_process(cmd, cwd=AGENT_HOME)
-            if rc != 0 or not stdout.strip():
-                await send_text("⚠️ No sessions found.", update)
-                return
-
-            lines = [l.strip() for l in stdout.strip().split("\n") if l.strip()]
-            all_sessions = []
-            for l in lines:
-                if not l.startswith("ses_"):
-                    continue
-                parts = l.split()
-                sid = parts[0]
-                title = " ".join(parts[1:-1]) if len(parts) > 2 else parts[1] if len(parts) > 1 else sid
-                all_sessions.append((sid, title))
-
-            kw = keyword.lower()
-            filtered = [(sid, t) for sid, t in all_sessions if kw in sid.lower() or kw in t.lower()]
+            filtered = await search_sessions_content(keyword)
             if not filtered:
                 await send_text(f"🔍 No results for \"{keyword}\".", update)
                 return
