@@ -39,7 +39,7 @@ async def build_status_text() -> str:
         f"─────────────\n"
         f"Uptime:    {uptime}\n"
         f"Model:     {model}\n"
-        f"Scheduler: {scheduler}\n"
+        f"Tasks: {scheduler}\n"
         f"CPU:       {cpu_pct}%\n"
         f"Memory:    {mem_info}\n"
         f"Disk:      {disk_info}"
