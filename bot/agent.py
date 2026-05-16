@@ -27,7 +27,13 @@ async def run_agent(prompt: str) -> str:
         timeout=OPENCODE_TIMEOUT,
         cwd=AGENT_HOME,
         env=env,
+        track_process=True,
     )
+
+    from .state import is_stop_requested, set_stop_requested
+    if is_stop_requested():
+        set_stop_requested(False)
+        return "🛑 Task stopped by user."
 
     if rc is None:
         return "❌ Agent timed out."
