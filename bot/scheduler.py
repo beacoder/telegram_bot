@@ -45,14 +45,7 @@ def is_task_due(task: dict) -> bool:
         run_at = datetime.strptime(task["run_at"], "%Y-%m-%d %H:%M")
     except (ValueError, KeyError):
         return False
-    now = datetime.now()
-    if now < run_at:
-        return False
-    # Skip tasks more than 1 hour overdue (e.g., scheduler was down)
-    if (now - run_at).total_seconds() > 3600:
-        task["done"] = True
-        return False
-    return True
+    return (datetime.now() >= run_at)
 
 
 def compute_next_run(task: dict):
