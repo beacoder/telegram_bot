@@ -12,9 +12,10 @@ def build_main_menu():
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("🧠 Models", callback_data="menu:ai")],
         [InlineKeyboardButton("📂 Sessions", callback_data="menu:sessions")],
-        [InlineKeyboardButton("📅 Scheduler", callback_data="menu:scheduler")],
+        [InlineKeyboardButton("📅 Tasks", callback_data="menu:scheduler")],
         [InlineKeyboardButton("🎤 Voice", callback_data="menu:voice")],
         [InlineKeyboardButton("📊 Status", callback_data="menu:status")],
+        [InlineKeyboardButton("🛑 Cancel", callback_data="menu:stop")],
     ])
 
 
@@ -118,6 +119,7 @@ def build_voice_menu():
 def build_status_menu():
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("🔄 Refresh", callback_data="status:refresh")],
+        [InlineKeyboardButton("🛑 Cancel", callback_data="menu:stop")],
         [InlineKeyboardButton("⬅️ Back", callback_data="menu:main")],
     ])
 
@@ -169,7 +171,7 @@ async def _handle_menu_sessions(query):
 
 @route(exact="menu:scheduler")
 async def _handle_menu_scheduler(query):
-    await render_menu(query, "📅 Scheduler", build_scheduler_menu())
+    await render_menu(query, "📅 Tasks", build_scheduler_menu())
 
 
 @route(exact="menu:voice")
@@ -181,6 +183,21 @@ async def _handle_menu_voice(query):
 @route(exact="status:refresh")
 async def _handle_menu_status(query):
     await render_menu(query, await build_status_text(), build_status_menu())
+
+
+@route(exact="menu:stop")
+async def _handle_menu_stop(query):
+    from .state import get_running_process, set_stop_requested
+    proc = get_running_process()
+    if proc is None:
+        await render_menu(query, "⚠️ No task is currently running.", build_main_menu())
+        return
+    set_stop_requested(True)
+    try:
+        proc.kill()
+    except Exception:
+        pass
+    await render_menu(query, "🛑 Stopping current task...", build_main_menu())
 
 
 @route(prefix="ai:")
@@ -410,7 +427,7 @@ async def _render_scheduler_tasks_page(query, page: int):
     from .scheduler import load_tasks
     all_tasks = load_tasks()
     if not all_tasks:
-        await render_menu(query, "📋 No scheduled tasks", build_scheduler_menu())
+        await render_menu(query, "📋 No tasks", build_scheduler_menu())
         return
 
     total = len(all_tasks)
@@ -419,7 +436,7 @@ async def _render_scheduler_tasks_page(query, page: int):
     start = (page - 1) * _TASK_PAGE_SIZE
     page_tasks = all_tasks[start:start + _TASK_PAGE_SIZE]
 
-    await render_menu(query, "📋 Scheduled Tasks:", build_scheduler_tasks_menu(page_tasks, "list", page, total_pages))
+    await render_menu(query, "📋 Tasks:", build_scheduler_tasks_menu(page_tasks, "list", page, total_pages))
 
 
 @route(prefix="scheduler:view:")
