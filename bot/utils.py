@@ -50,7 +50,7 @@ def validate_whisper():
     ])
 
 
-async def run_process(cmd, timeout=300, cwd=None, env=None):
+async def run_process(cmd, timeout=300, cwd=None, env=None, track_process=False):
     cmd_str = shlex.join(cmd) if isinstance(cmd, list) else cmd
     proc = await asyncio.create_subprocess_shell(
         cmd_str,
@@ -60,6 +60,10 @@ async def run_process(cmd, timeout=300, cwd=None, env=None):
         cwd=cwd
     )
 
+    if track_process:
+        from .state import set_running_process
+        set_running_process(proc)
+
     stdout, stderr = b"", b""
     try:
         stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
@@ -68,6 +72,11 @@ async def run_process(cmd, timeout=300, cwd=None, env=None):
         proc.kill()
         await proc.wait()
         returncode = None
+    finally:
+        if track_process:
+            from .state import clear_running_process
+            clear_running_process()
+
     clean_out = (stdout or b"").decode(errors="replace").strip()
     clean_err = (stderr or b"").decode(errors="replace").strip()
 
