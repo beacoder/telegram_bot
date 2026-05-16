@@ -2,7 +2,7 @@
 
 ## Overview
 
-A Telegram bot that connects directly to an OpenCode agent backend. Supports persistent AI sessions, file uploads, interactive menus, multiple model switching, scheduled tasks, voice I/O, and proxy environments.
+A Telegram bot that connects directly to an OpenCode agent backend. Supports persistent AI sessions, file uploads, interactive menus, multiple model switching, task scheduling, voice I/O, and proxy environments.
 
 ## Architecture
 
@@ -32,7 +32,7 @@ telegram_bot/
 │   ├── menu.py             # Interactive menu system (builders + callback handler)
 │   ├── messaging.py        # Telegram message utilities (send_text, send_audio, send_files)
 │   ├── scheduler.py        # Task scheduler (cron-like)
-│   ├── state.py            # Agent lock, model key, bot start time, pending actions
+│   ├── state.py            # Agent lock, running process, model key, bot start time, pending actions
 │   ├── status.py           # Bot health status builder (uptime, CPU, memory, disk)
 │   └── utils.py            # Helpers (process runner, cleanup)
 ```
@@ -45,11 +45,11 @@ Use `/menu` or the menu appears automatically on bot startup:
 |------|---------|
 | **🧠 Models** | Free / Flash / Pro (with ✓ on current) |
 | **📂 Sessions** | New Session / View History (with pagination) / Search Session |
-| **📅 Scheduler** | New Task / View Tasks / Search Task |
+| **📅 Tasks** | New Task / View Tasks / Search Task |
 | **🎤 Voice** | Toggle voice output ON/OFF |
-| **📊 Status** | Uptime, model, scheduler health, CPU, memory, disk |
+| **📊 Status** | Uptime, model, tasks health, CPU, memory, disk |
 
-To add a scheduled task, just send a natural language prompt like:
+To add a task, just send a natural language prompt like:
 *"提醒我每天早上7点起床"*, *"remind me to check email tomorrow at 9am"*, *"每天下午3点查询大盘数据"*
 
 All menus have ⬅️ Back buttons to return to the main menu.
@@ -60,7 +60,7 @@ All menus have ⬅️ Back buttons to return to the main menu.
 |---------|-------------|
 | `/menu` | Show interactive menu |
 | `/help` | Show available commands |
-| `/status` | Show bot health info (uptime, model, scheduler, CPU, memory, disk) |
+| `/status` | Show bot health info (uptime, model, tasks, CPU, memory, disk) |
 | `/history [n]` | Show session history (latest n, default all) |
 | `/continue <session-id>` | Continue session |
 | `/delete <session-id>` | Delete a session |
@@ -68,6 +68,7 @@ All menus have ⬅️ Back buttons to return to the main menu.
 | `/flash` | Switch to `deepseek/deepseek-v4-flash` model |
 | `/pro` | Switch to `deepseek/deepseek-v4-pro` model |
 | `/voice` | Toggle voice output (TTS) |
+| `/cancel` | Stop the currently running agent task |
 | `/new` | New session |
 | Any text | Send to the agent for processing |
 | Any file | Download and optionally transcribe, then run agent |
@@ -80,11 +81,12 @@ All menus have ⬅️ Back buttons to return to the main menu.
 - **File Support** — Documents, images, videos, audio; files auto-returned to Telegram
 - **Voice Transcription** — Voice messages transcribed via whisper.cpp before agent execution
 - **Multiple AI Models** — Switch between `free`, `flash`, and `pro` models
-- **Task Scheduler** — Lightweight cron-style scheduler supporting daily, weekly, monthly, and interval-based tasks; add/delete tasks via menu; add tasks using natural language
+- **Task Scheduler** — Lightweight cron-style scheduler supporting daily, weekly, monthly, and interval-based tasks; add/edit/delete tasks via menu; add tasks using natural language
 - **Bot Status Monitoring** — Real-time bot health: uptime, model, scheduler health, CPU, memory, disk usage
 - **Voice Output (TTS)** — Agent responses converted to speech via Piper; non-Chinese characters filtered automatically for stable Chinese voice synthesis
 - **Proxy Support** — Works through HTTP/SOCKS proxy environments
 - **Task Locking** — Prevents overlapping agent executions
+- **Cancel Running Task** — Use `/cancel` or menu button to stop an in-progress agent task mid-execution
 - **Authorized User Only** — All operations restricted to `AUTHORIZED_USER_ID`
 
 ## Configuration
