@@ -135,7 +135,7 @@ async def scheduler_loop(app):
         except Exception as e:
             try:
                 set_scheduler_error(str(e))
-                await send_text(f"❌ Scheduler error: {e}", None, app)
+                await send_text(f"❌ Tasks error: {e}", None, app)
             except Exception:
                 logging.exception("Failed to send Telegram alert")
         await asyncio.sleep(30)
