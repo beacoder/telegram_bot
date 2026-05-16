@@ -21,6 +21,7 @@ from bot.handlers import (
     handle_flash,
     handle_pro,
     handle_new,
+    handle_stop,
     handle_message,
     handle_file,
     handle_voice_toggle,
@@ -54,6 +55,7 @@ def main():
     app.add_handler(CommandHandler("flash", handle_flash))
     app.add_handler(CommandHandler("pro", handle_pro))
     app.add_handler(CommandHandler("new", handle_new))
+    app.add_handler(CommandHandler("cancel", handle_stop))
     app.add_handler(CommandHandler("voice", handle_voice_toggle))
     app.add_handler(CommandHandler("menu", handle_menu))
     app.add_handler(CallbackQueryHandler(handle_callback))
@@ -79,6 +81,7 @@ def main():
                 BotCommand("continue", "Continue a session"),
                 BotCommand("delete", "Delete a session"),
                 BotCommand("new", "New session"),
+                BotCommand("cancel", "Stop running agent task"),
                 BotCommand("free", "Use free model"),
                 BotCommand("flash", "Use deepseek-v4-flash model"),
                 BotCommand("pro", "Use deepseek-v4-pro model"),
