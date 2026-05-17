@@ -119,7 +119,6 @@ def build_voice_menu():
 def build_status_menu():
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("🔄 Refresh", callback_data="status:refresh")],
-        [InlineKeyboardButton("🛑 Cancel", callback_data="menu:stop")],
         [InlineKeyboardButton("⬅️ Back", callback_data="menu:main")],
     ])
 
