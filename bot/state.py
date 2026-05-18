@@ -11,6 +11,7 @@ user_pending_action: dict = {}
 _search_query: dict = {}
 running_process = None
 stop_requested = False
+_restart_pending = False
 
 
 def set_search_query(user_id: int, query: str):
@@ -102,3 +103,17 @@ def set_stop_requested(val: bool = True):
 
 def is_stop_requested():
     return stop_requested
+
+
+def request_restart():
+    global _restart_pending
+    _restart_pending = True
+
+
+def is_restart_pending():
+    return _restart_pending
+
+
+def clear_restart():
+    global _restart_pending
+    _restart_pending = False
