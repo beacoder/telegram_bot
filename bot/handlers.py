@@ -256,14 +256,6 @@ async def handle_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/flash - Use deepseek-v4-flash model\n"
         "/pro - Use deepseek-v4-pro model\n"
         "/voice - Toggle voice output (TTS)\n"
-        "/restart - Restart bot\n"
         "Any other message - Run agent\n",
         update
     )
-
-
-@authorized
-async def handle_restart(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    from .state import request_restart
-    await send_text("🔄 Restarting bot...", update)
-    request_restart()
