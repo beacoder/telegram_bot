@@ -1,83 +1,119 @@
-import os
-import shutil
-import shlex
 import asyncio
-from .config import (
-    AGENT_MEDIA_DIR,
-    SESSION_MARKER,
-    PROXY_URL,
-    MODELS,
-    WHISPER_CPP_BIN,
-    WHISPER_MODEL,
-)
+from datetime import datetime
+from .config import CURRENT_MODEL_KEY
+
+current_model_key = CURRENT_MODEL_KEY
+agent_lock = asyncio.Lock()
+voice_enabled = False
+bot_start_time: datetime = None
+scheduler_error: str = None
+user_pending_action: dict = {}
+_search_query: dict = {}
+running_process = None
+stop_requested = False
+_restart_pending = False
 
 
-def get_model() -> str:
-    from .state import get_model_key
-    return MODELS[get_model_key()]
+def set_search_query(user_id: int, query: str):
+    _search_query[user_id] = query
 
 
-def new_session():
-    if os.path.exists(SESSION_MARKER):
-        os.remove(SESSION_MARKER)
+def get_search_query(user_id: int) -> str:
+    return _search_query.get(user_id, "")
 
 
-def sanitize_prompt(prompt: str) -> str:
-    if not prompt:
-        return ""
-    prompt = prompt.strip()
-    if len(prompt) > 10000:
-        prompt = prompt[:10000]
-    return prompt
+def clear_search_query(user_id: int):
+    _search_query.pop(user_id, None)
 
 
-def cleanup_media():
-    for item in os.listdir(AGENT_MEDIA_DIR):
-        item_path = os.path.join(AGENT_MEDIA_DIR, item)
-        if os.path.isdir(item_path):
-            shutil.rmtree(item_path)
-        else:
-            os.remove(item_path)
+def get_model_key():
+    return current_model_key
 
 
-def validate_whisper():
-    return all([
-        WHISPER_CPP_BIN,
-        WHISPER_MODEL,
-        os.path.isfile(WHISPER_CPP_BIN),
-        os.access(WHISPER_CPP_BIN, os.X_OK),
-        os.path.isfile(WHISPER_MODEL),
-    ])
+def set_model_key(key: str):
+    global current_model_key
+    current_model_key = key
 
 
-async def run_process(cmd, timeout=300, cwd=None, env=None, track_process=False):
-    cmd_str = shlex.join(cmd) if isinstance(cmd, list) else cmd
-    proc = await asyncio.create_subprocess_shell(
-        cmd_str,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-        env=env,
-        cwd=cwd
-    )
+def toggle_voice():
+    global voice_enabled
+    voice_enabled = not voice_enabled
+    return voice_enabled
 
-    if track_process:
-        from .state import set_running_process
-        set_running_process(proc)
 
-    stdout, stderr = b"", b""
-    try:
-        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
-        returncode = proc.returncode
-    except asyncio.TimeoutError:
-        proc.kill()
-        await proc.wait()
-        returncode = None
-    finally:
-        if track_process:
-            from .state import clear_running_process
-            clear_running_process()
+def is_voice_enabled():
+    return voice_enabled
 
-    clean_out = (stdout or b"").decode(errors="replace").strip()
-    clean_err = (stderr or b"").decode(errors="replace").strip()
 
-    return (returncode, clean_out, clean_err)
+def set_bot_start_time(dt: datetime):
+    global bot_start_time
+    bot_start_time = dt
+
+
+def get_bot_start_time() -> datetime:
+    return bot_start_time
+
+
+def set_scheduler_error(msg: str):
+    global scheduler_error
+    scheduler_error = msg
+
+
+def clear_scheduler_error():
+    global scheduler_error
+    scheduler_error = None
+
+
+def get_scheduler_status() -> str:
+    if scheduler_error is None:
+        return "Running"
+    return f"Stopped: {scheduler_error}"
+
+
+def set_pending_action(user_id: int, action: str, data: dict = None):
+    user_pending_action[user_id] = {"action": action, "data": data or {}}
+
+
+def get_pending_action(user_id: int) -> dict:
+    return user_pending_action.get(user_id)
+
+
+def clear_pending_action(user_id: int):
+    user_pending_action.pop(user_id, None)
+
+
+def set_running_process(proc):
+    global running_process
+    running_process = proc
+
+
+def get_running_process():
+    return running_process
+
+
+def clear_running_process():
+    global running_process
+    running_process = None
+
+
+def set_stop_requested(val: bool = True):
+    global stop_requested
+    stop_requested = val
+
+
+def is_stop_requested():
+    return stop_requested
+
+
+def request_restart():
+    global _restart_pending
+    _restart_pending = True
+
+
+def is_restart_pending():
+    return _restart_pending
+
+
+def clear_restart():
+    global _restart_pending
+    _restart_pending = False
