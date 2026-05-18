@@ -2,7 +2,6 @@ import os
 import shutil
 import shlex
 import asyncio
-import logging
 from .config import (
     AGENT_MEDIA_DIR,
     SESSION_MARKER,
@@ -82,16 +81,3 @@ async def run_process(cmd, timeout=300, cwd=None, env=None, track_process=False)
     clean_err = (stderr or b"").decode(errors="replace").strip()
 
     return (returncode, clean_out, clean_err)
-
-
-async def health_check_loop(app):
-    from .state import request_restart
-    while True:
-        try:
-            await asyncio.wait_for(app.bot.get_me(), timeout=10)
-            logging.debug("Health check OK")
-        except Exception as e:
-            logging.error(f"Health check failed: {e}, requesting restart...")
-            request_restart()
-            break
-        await asyncio.sleep(60)
