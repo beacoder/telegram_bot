@@ -75,10 +75,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 return
             from .scheduler import load_tasks, save_tasks
             tasks = load_tasks()
-            tasks = [t for t in tasks if t.get("id") != old_task_id]
+            for task in tasks:
+                if task.get("id") == old_task_id:
+                    task["prompt"] = user_input
+                    break
             save_tasks(tasks)
-            await send_text("🗑️ Old task deleted, creating new one...", update)
-            asyncio.create_task(execute_task(user_input, update, None))
+            await send_text(f"✅ Task updated: {user_input[:50]}...", update)
             return
 
         if pending["action"] == "scheduler_search":
