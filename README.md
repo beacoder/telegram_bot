@@ -34,7 +34,7 @@ telegram_bot/
 │   ├── scheduler.py        # Task scheduler (cron-like)
 │   ├── state.py            # Agent lock, running process, model key, bot start time, pending actions
 │   ├── status.py           # Bot health status builder (uptime, CPU, memory, disk)
-│   └── utils.py            # Helpers (process runner, cleanup, health check)
+│   └── utils.py            # Helpers (process runner, cleanup)
 ```
 
 ## Interactive Menu
@@ -70,7 +70,6 @@ All menus have ⬅️ Back buttons to return to the main menu.
 | `/voice` | Toggle voice output (TTS) |
 | `/cancel` | Stop the currently running agent task |
 | `/new` | New session |
-| `/restart` | Restart bot (auto-reconnects on health check failure) |
 | Any text | Send to the agent for processing |
 | Any file | Download and optionally transcribe, then run agent |
 
@@ -88,7 +87,6 @@ All menus have ⬅️ Back buttons to return to the main menu.
 - **Proxy Support** — Works through HTTP/SOCKS proxy environments
 - **Task Locking** — Prevents overlapping agent executions
 - **Cancel Running Task** — Use `/cancel` or menu button to stop an in-progress agent task mid-execution
-- **Automatic Health Check & Restart** — Background health check verifies Telegram API connectivity every 60s; auto-restarts on failure; manual restart via `/restart` command
 - **Authorized User Only** — All operations restricted to `AUTHORIZED_USER_ID`
 
 ## Configuration
