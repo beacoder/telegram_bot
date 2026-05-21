@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import os
 import sys
 import asyncio
 import logging
@@ -10,6 +11,7 @@ from telegram.ext import (
     CallbackQueryHandler,
     filters,
 )
+from telegram.error import TimedOut, NetworkError, TelegramError
 from bot.config import TOKEN, AUTHORIZED_USER_ID, PROXY_URL
 from bot.handlers import (
     handle_help,
@@ -25,17 +27,14 @@ from bot.handlers import (
     handle_message,
     handle_file,
     handle_voice_toggle,
+    handle_restart,
 )
 from bot.menu import handle_menu, handle_callback, build_main_menu
 from bot.state import set_bot_start_time
 from bot.scheduler import scheduler_loop
 
 
-def main():
-    if not TOKEN or not AUTHORIZED_USER_ID:
-        logging.error("TOKEN and AUTHORIZED_USER_ID must be set")
-        sys.exit(1)
-
+def build_application():
     app = (
         ApplicationBuilder()
         .token(TOKEN)
@@ -58,6 +57,7 @@ def main():
     app.add_handler(CommandHandler("cancel", handle_stop))
     app.add_handler(CommandHandler("voice", handle_voice_toggle))
     app.add_handler(CommandHandler("menu", handle_menu))
+    app.add_handler(CommandHandler("restart", handle_restart))
     app.add_handler(CallbackQueryHandler(handle_callback))
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
     app.add_handler(MessageHandler(
@@ -65,8 +65,23 @@ def main():
         handle_file
     ))
 
+    _consecutive_connection_errors = 0
+    MAX_CONSECUTIVE_ERRORS = 10
+
     async def error_handler(update, context):
-        logging.error(f"Exception: {context.error}")
+        nonlocal _consecutive_connection_errors
+        error = context.error
+        if isinstance(error, (TimedOut, NetworkError, ConnectionError, OSError)):
+            _consecutive_connection_errors += 1
+            logging.error(f"Connection error ({_consecutive_connection_errors}/{MAX_CONSECUTIVE_ERRORS}): {error}")
+            if _consecutive_connection_errors >= MAX_CONSECUTIVE_ERRORS:
+                logging.critical("Too many consecutive connection errors, restarting...")
+                _consecutive_connection_errors = 0
+                logging.shutdown()
+                os.execv(sys.executable, [sys.executable] + sys.argv)
+        else:
+            _consecutive_connection_errors = 0
+            logging.error(f"Exception: {error}")
     app.add_error_handler(error_handler)
 
     async def _post_init(app):
@@ -86,6 +101,7 @@ def main():
                 BotCommand("flash", "Use deepseek-v4-flash model"),
                 BotCommand("pro", "Use deepseek-v4-pro model"),
                 BotCommand("voice", "Toggle voice output"),
+                BotCommand("restart", "Restart the bot"),
             ])
         except Exception as e:
             logging.error(f"Failed to set commands: {e}")
@@ -97,7 +113,38 @@ def main():
         )
     app.post_init = _post_init
 
-    app.run_polling(drop_pending_updates=True)
+    return app
+
+
+def run_with_health_check():
+    BASE_DELAY = 5
+    MAX_DELAY = 300
+    delay = BASE_DELAY
+    attempt = 0
+
+    while True:
+        try:
+            attempt += 1
+            logging.info(f"Starting bot (attempt {attempt})...")
+            app = build_application()
+            app.run_polling(drop_pending_updates=True)
+            logging.info("Bot exited cleanly.")
+            break
+        except (TimedOut, NetworkError, ConnectionError, OSError) as e:
+            logging.warning(f"[{attempt}] Connection issue: {type(e).__name__}: {e}. Restarting in {delay}s...")
+        except TelegramError as e:
+            logging.warning(f"[{attempt}] Telegram API error: {type(e).__name__}: {e}. Restarting in {delay}s...")
+        except Exception as e:
+            logging.error(f"[{attempt}] Unexpected error: {type(e).__name__}: {e}. Restarting in {delay}s...")
+        time.sleep(delay)
+        delay = min(delay * 2, MAX_DELAY)
+
+
+def main():
+    if not TOKEN or not AUTHORIZED_USER_ID:
+        logging.error("TOKEN and AUTHORIZED_USER_ID must be set")
+        sys.exit(1)
+    run_with_health_check()
 
 
 if __name__ == "__main__":
