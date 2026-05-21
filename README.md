@@ -64,7 +64,7 @@ All menus have ⬅️ Back buttons to return to the main menu.
 | `/history [n]` | Show session history (latest n, default all) |
 | `/continue <session-id>` | Continue session |
 | `/delete <session-id>` | Delete a session |
-| `/free` | Switch to the free model (`opencode/minimax-m2.5-free`) |
+| `/free` | Switch to the free model |
 | `/flash` | Switch to `deepseek/deepseek-v4-flash` model |
 | `/pro` | Switch to `deepseek/deepseek-v4-pro` model |
 | `/voice` | Toggle voice output (TTS) |
