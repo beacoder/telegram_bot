@@ -69,6 +69,7 @@ All menus have ⬅️ Back buttons to return to the main menu.
 | `/pro` | Switch to `deepseek/deepseek-v4-pro` model |
 | `/voice` | Toggle voice output (TTS) |
 | `/cancel` | Stop the currently running agent task |
+| `/restart` | Restart the bot (reconnects to Telegram API) |
 | `/new` | New session |
 | Any text | Send to the agent for processing |
 | Any file | Download and optionally transcribe, then run agent |
@@ -88,6 +89,8 @@ All menus have ⬅️ Back buttons to return to the main menu.
 - **Task Locking** — Prevents overlapping agent executions
 - **Cancel Running Task** — Use `/cancel` or menu button to stop an in-progress agent task mid-execution
 - **Authorized User Only** — All operations restricted to `AUTHORIZED_USER_ID`
+- **Health Check & Auto-Restart** — Tracks consecutive connection errors (TimedOut, NetworkError, OSError); after 10 consecutive failures the bot automatically restarts itself via `os.execv`; exponential backoff (5s–300s) on startup failures
+- **Manual Restart Command** — Use `/restart` to gracefully restart the bot without stopping the process
 
 ## Configuration
 
@@ -163,6 +166,8 @@ cd telegram_bot
 # Set environment variables, then:
 python telegram_bot.py
 ```
+
+The bot automatically retries on connection failure with exponential backoff and restarts itself after 10 consecutive API errors or on `/restart` command.
 
 ## Typical Workflow
 
