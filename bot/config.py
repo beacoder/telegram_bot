@@ -27,7 +27,7 @@ MAX_FILE_SIZE = DEFAULT_MAX_FILE_SIZE
 LOG_LEVEL = "INFO"
 
 MODELS = {
-    "free": "opencode/minimax-m2.5-free",
+    "free": "opencode/deepseek-v4-flash-free",
     "flash": "deepseek/deepseek-v4-flash",
     "pro": "deepseek/deepseek-v4-pro",
 }
