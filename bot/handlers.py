@@ -12,6 +12,9 @@ from .state import (
 from .messaging import send_text
 from .auth import authorized
 import asyncio
+import os
+import sys
+import logging
 
 
 @authorized
@@ -259,3 +262,10 @@ async def handle_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Any other message - Run agent\n",
         update
     )
+
+
+@authorized
+async def handle_restart(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await send_text("🔄 Restarting bot...", update)
+    logging.shutdown()
+    os.execv(sys.executable, [sys.executable] + sys.argv)
