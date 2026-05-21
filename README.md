@@ -167,8 +167,6 @@ cd telegram_bot
 python telegram_bot.py
 ```
 
-The bot automatically retries on connection failure with exponential backoff and restarts itself after 10 consecutive API errors or on `/restart` command.
-
 ## Typical Workflow
 
 1. Send a message, file, or use the interactive `/menu`
