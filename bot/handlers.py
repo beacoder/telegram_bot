@@ -259,6 +259,7 @@ async def handle_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/flash - Use deepseek-v4-flash model\n"
         "/pro - Use deepseek-v4-pro model\n"
         "/voice - Toggle voice output (TTS)\n"
+        "/restart - Restart the bot\n"
         "Any other message - Run agent\n",
         update
     )
